@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: langperf
+      POSTGRES_PASSWORD: langperf
+      POSTGRES_DB: langperf
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langperf"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  langperf-api:
+    build:
+      context: ./api
+    environment:
+      DATABASE_URL: postgresql+asyncpg://langperf:langperf@postgres:5432/langperf
+      LANGPERF_LOG_LEVEL: INFO
+    ports:
+      - "4318:4318"
+    volumes:
+      - ./api/app:/app/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 4318 --reload
+
+  langperf-web:
+    build:
+      context: ./web
+    environment:
+      LANGPERF_API_URL: http://langperf-api:4318
+      NEXT_PUBLIC_LANGPERF_API_URL: http://localhost:4318
+    ports:
+      - "3030:3000"
+    volumes:
+      - ./web/app:/app/app
+      - ./web/components:/app/components
+      - ./web/lib:/app/lib
+      - ./web/public:/app/public
+    depends_on:
+      - langperf-api
+    command: npm run dev
+
+volumes:
+  postgres_data:
