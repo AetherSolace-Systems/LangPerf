@@ -12,6 +12,7 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
+from langperf._baggage import LangPerfBaggageSpanProcessor
 from langperf.instrumentation import install_instrumentations
 
 logger = logging.getLogger("langperf")
@@ -27,9 +28,10 @@ def init(
 ) -> TracerProvider:
     """Configure LangPerf.
 
-    Sets up an OTel TracerProvider with an OTLP/HTTP exporter and auto-installs
-    OpenInference's `openai` instrumentation. Safe to call multiple times; only
-    the first call wires up the global provider and instrumentations.
+    Sets up an OTel TracerProvider with an OTLP/HTTP exporter, registers the
+    LangPerf baggage-propagation span processor, and auto-installs OpenInference's
+    `openai` instrumentation. Safe to call multiple times; only the first call
+    wires up the global provider and instrumentations.
 
     Resolution order for each argument: explicit kwarg > env var > default.
 
@@ -52,6 +54,9 @@ def init(
     resource = Resource.create(resource_attrs)
 
     provider = TracerProvider(resource=resource)
+    # Baggage processor first so every span (including ones we export later)
+    # has trajectory attributes stamped by the time it ends.
+    provider.add_span_processor(LangPerfBaggageSpanProcessor())
     exporter = OTLPSpanExporter(endpoint=endpoint.rstrip("/") + "/v1/traces")
     provider.add_span_processor(BatchSpanProcessor(exporter))
     trace_api.set_tracer_provider(provider)
@@ -70,11 +75,7 @@ def init(
 
 
 def flush(timeout_millis: int = 5000) -> bool:
-    """Force-flush pending spans through the batch processor.
-
-    Useful for short-lived scripts where the process exits before the batch
-    processor's background thread has a chance to ship the final batch.
-    """
+    """Force-flush pending spans through the batch processor."""
     provider = _state.get("provider")
     if provider is None:
         return False

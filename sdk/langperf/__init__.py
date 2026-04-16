@@ -1,9 +1,8 @@
-"""LangPerf Python SDK — tracer for agent trajectories.
+"""LangPerf Python SDK — tracer for agent trajectories."""
 
-M1 surface: `init()` and `flush()`. `trajectory()` and `node()` arrive in M4.
-"""
-
+from langperf.node import node
 from langperf.tracer import flush, init
+from langperf.trajectory import trajectory
 
-__all__ = ["init", "flush"]
+__all__ = ["init", "trajectory", "node", "flush"]
 __version__ = "0.1.0"
