@@ -2,149 +2,172 @@
 
 import "@xyflow/react/dist/style.css";
 
-import dagre from "dagre";
 import { useMemo } from "react";
 import {
   Background,
   BackgroundVariant,
   Controls,
-  Handle,
-  MarkerType,
-  Position,
   ReactFlow,
-  type Edge,
   type Node,
   type NodeProps,
 } from "@xyflow/react";
 
 import type { Span } from "@/lib/api";
 import { DRIFT, kindSwatch } from "@/lib/colors";
-import { buildEntityGraph, type ActionEdge, type Entity } from "@/lib/entity-graph";
 import { fmtDuration, fmtTokens } from "@/lib/format";
+import { buildSequenceLayout, type LayoutNode } from "@/lib/sequence-layout";
 
-type NodeData = {
-  entity: Entity;
-  selected: boolean;
-};
+type StepData = { layout: LayoutNode; selected: boolean };
+type FrameData = { layout: LayoutNode; selected: boolean };
 
-type EntityNode = Node<NodeData, "entity">;
+type StepNode = Node<StepData, "step">;
+type FrameNode = Node<FrameData, "frame">;
 
-const NODE_WIDTH = 220;
-const NODE_HEIGHT = 72;
-
-const kindIcon: Record<Entity["kind"], string> = {
-  trajectory: "◆",
-  agent: "◇",
+const kindGlyph: Record<string, string> = {
   llm: "✦",
   tool: "▸",
+  tool_call: "▸",
   reasoning: "≈",
+  agent: "◇",
+  trajectory: "◆",
 };
 
-const kindLabel: Record<Entity["kind"], string> = {
-  trajectory: "trajectory",
-  agent: "agent",
-  llm: "llm",
-  tool: "tool",
-  reasoning: "reasoning",
-};
+function StepNodeComp({ data }: NodeProps<StepNode>) {
+  const { layout, selected } = data;
+  const { span, nodeKind, execOrder } = layout;
+  const swatch = kindSwatch(nodeKind);
+  const tokens =
+    (span?.attributes["llm.token_count.total"] as number | undefined) ??
+    (span?.attributes["gen_ai.usage.total_tokens"] as number | undefined) ??
+    null;
+  const isError = span?.status_code === "ERROR";
 
-function EntityNodeComp({ data, selected }: NodeProps<EntityNode>) {
-  const { entity } = data;
-  const swatch = kindSwatch(entity.kind);
-  const isActive = selected || data.selected;
+  // LLM calls are pills; everything else is a rounded rect.
+  const radius = nodeKind === "llm" ? 999 : 10;
 
   return (
     <div
-      className="rounded-full border-2 px-4 py-2 cursor-pointer transition-colors backdrop-blur-sm"
+      className="relative transition-colors cursor-pointer"
       style={{
-        width: NODE_WIDTH,
-        minHeight: NODE_HEIGHT,
-        borderColor: isActive ? DRIFT.marigold : swatch.border,
-        background: swatch.bg,
-        boxShadow: isActive ? `0 0 0 2px ${DRIFT.marigold}44` : "none",
+        width: layout.width,
+        height: layout.height,
+        borderRadius: radius,
+        border: `2px solid ${selected ? DRIFT.marigold : swatch.border}`,
+        background: "var(--surface)",
+        boxShadow: selected ? `0 0 0 2px ${DRIFT.marigold}44` : undefined,
       }}
     >
-      <Handle
-        type="target"
-        position={Position.Top}
-        isConnectable={false}
-        style={{ background: DRIFT.twilight, borderColor: DRIFT.twilight, width: 6, height: 6 }}
-      />
-      <div className="flex items-center gap-2">
-        <span style={{ color: swatch.fg }} className="text-lg leading-none">
-          {kindIcon[entity.kind]}
-        </span>
+      <div className="h-full px-3 py-2 flex items-center gap-2.5">
+        {execOrder ? (
+          <div
+            className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-mono tabular-nums font-semibold flex-shrink-0"
+            style={{ background: DRIFT.marigold, color: DRIFT.midnight }}
+          >
+            {execOrder}
+          </div>
+        ) : null}
         <div className="min-w-0 flex-1">
           <div
-            className="text-[10px] uppercase tracking-wider"
+            className="text-[9px] uppercase tracking-wider font-mono flex items-center gap-1"
             style={{ color: swatch.fg }}
           >
-            {kindLabel[entity.kind]}
-            {entity.subtitle ? (
-              <span className="text-twilight ml-1">· {entity.subtitle}</span>
-            ) : null}
+            <span>{kindGlyph[nodeKind] ?? "•"}</span>
+            <span>{nodeKind}</span>
           </div>
-          <div
-            className="text-sm font-medium text-linen truncate"
-            title={entity.label}
-          >
-            {entity.label}
+          <div className="text-[12px] font-medium text-linen truncate mt-0.5">
+            {layout.label}
           </div>
         </div>
+        <div className="flex flex-col items-end text-[9px] font-mono tabular-nums text-twilight flex-shrink-0">
+          {tokens != null ? <div>{fmtTokens(tokens)}t</div> : null}
+          <div>{fmtDuration(span?.duration_ms ?? null)}</div>
+        </div>
+        {isError ? (
+          <span className="absolute -top-1 -right-1 text-coral text-sm">!</span>
+        ) : null}
       </div>
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        isConnectable={false}
-        style={{ background: DRIFT.twilight, borderColor: DRIFT.twilight, width: 6, height: 6 }}
-      />
     </div>
   );
 }
 
-const nodeTypes = { entity: EntityNodeComp };
+function FrameNodeComp({ data }: NodeProps<FrameNode>) {
+  const { layout, selected } = data;
+  const { frameKind, label, span, nodeKind } = layout;
 
-function layout(
-  nodes: EntityNode[],
-  edges: Edge[],
-): { nodes: EntityNode[]; edges: Edge[] } {
-  const g = new dagre.graphlib.Graph();
-  g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({
-    rankdir: "TB",
-    nodesep: 44,
-    ranksep: 90,
-    marginx: 20,
-    marginy: 20,
-  });
+  const tokens =
+    (span?.attributes["llm.token_count.total"] as number | undefined) ??
+    null;
+  const duration = span?.duration_ms ?? null;
 
-  for (const n of nodes) {
-    g.setNode(n.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
+  if (frameKind === "parallel") {
+    return (
+      <div
+        className="relative"
+        style={{
+          width: layout.width,
+          height: layout.height,
+          borderRadius: 10,
+          border: `1.5px dashed ${DRIFT.twilight}`,
+          background: "rgba(31,32,53,0.35)",
+        }}
+      >
+        <div
+          className="absolute -top-2.5 left-4 px-2 text-[9px] font-mono uppercase tracking-wider"
+          style={{ background: DRIFT.midnight, color: DRIFT.twilight }}
+        >
+          ∥ {label}
+        </div>
+      </div>
+    );
   }
-  for (const e of edges) {
-    g.setEdge(e.source, e.target);
-  }
-  dagre.layout(g);
 
-  const positioned = nodes.map((n) => {
-    const pos = g.node(n.id);
-    return {
-      ...n,
-      position: { x: pos.x - NODE_WIDTH / 2, y: pos.y - NODE_HEIGHT / 2 },
-    };
-  });
-  return { nodes: positioned, edges };
+  // agent / trajectory / generic container
+  const swatch = kindSwatch(nodeKind);
+  const borderColor = selected ? DRIFT.marigold : swatch.border;
+  const titleBg = `linear-gradient(to bottom, ${swatch.bg}, transparent)`;
+
+  return (
+    <div
+      className="relative"
+      style={{
+        width: layout.width,
+        height: layout.height,
+        borderRadius: 12,
+        border: `2px solid ${borderColor}`,
+        background: "rgba(20,20,31,0.55)",
+      }}
+    >
+      <div
+        className="absolute top-0 left-0 right-0 rounded-t-[10px] border-b px-3 flex items-center gap-2"
+        style={{
+          height: 34,
+          background: titleBg,
+          borderColor: swatch.border,
+        }}
+      >
+        <span style={{ color: swatch.fg }} className="text-sm leading-none">
+          {kindGlyph[nodeKind] ?? "◆"}
+        </span>
+        <span
+          className="text-[9px] uppercase tracking-wider font-mono"
+          style={{ color: swatch.fg }}
+        >
+          {nodeKind}
+        </span>
+        <span className="text-sm font-medium text-linen truncate">{label}</span>
+        <div className="ml-auto flex items-center gap-3 text-[10px] font-mono tabular-nums text-twilight">
+          {tokens != null ? <span>{fmtTokens(tokens)}t</span> : null}
+          {duration != null ? <span>{fmtDuration(duration)}</span> : null}
+        </div>
+      </div>
+    </div>
+  );
 }
 
-function edgeLabel(e: ActionEdge): string {
-  const count = e.callCount === 1 ? "1 call" : `${e.callCount} calls`;
-  const parts = [`${e.action} · ${count}`];
-  if (e.totalTokens > 0) parts.push(fmtTokens(e.totalTokens) + "t");
-  if (e.totalDurationMs > 0) parts.push(fmtDuration(e.totalDurationMs));
-  return parts.join(" · ");
-}
-
-type EdgePayload = { actionEdge: ActionEdge };
+const nodeTypes = {
+  step: StepNodeComp,
+  frame: FrameNodeComp,
+};
 
 export function TrajectoryGraph({
   spans,
@@ -155,117 +178,53 @@ export function TrajectoryGraph({
   selectedId: string | null;
   onSelect: (span: Span) => void;
 }) {
-  const { entities, edges } = useMemo(
-    () => buildEntityGraph(spans),
-    [spans],
-  );
-
-  const { nodes, rfEdges, edgePayload } = useMemo(() => {
-    const selectedSpan = selectedId
-      ? spans.find((s) => s.span_id === selectedId) ?? null
-      : null;
-
-    const nodesRaw: EntityNode[] = entities.map((e) => ({
-      id: e.id,
-      type: "entity",
-      position: { x: 0, y: 0 },
+  const { rfNodes } = useMemo(() => {
+    const { all } = buildSequenceLayout(spans);
+    const nodes: Node[] = all.map((ln) => ({
+      id: ln.id,
+      type: ln.kind, // "step" | "frame"
+      position: { x: ln.x, y: ln.y },
+      parentId: ln.parentId ?? undefined,
+      extent: ln.parentId ? "parent" : undefined,
+      draggable: false,
+      selectable: ln.kind === "step",
+      // Compound frame nodes must declare size so children can be positioned
+      // relative to them; React Flow reads from style.width/height.
+      style: { width: ln.width, height: ln.height },
       data: {
-        entity: e,
-        selected: selectedSpan
-          ? e.spans.some((s) => s.span_id === selectedSpan.span_id)
-          : false,
-      },
+        layout: ln,
+        selected: ln.span?.span_id === selectedId,
+      } satisfies StepData | FrameData,
+      // Frames must render first so children render on top. React Flow
+      // respects node order in the array for z-ordering.
+      zIndex: ln.kind === "frame"
+        ? (ln.frameKind === "parallel" ? 1 : 0)
+        : 10,
     }));
+    // Sort: frames first (by depth ascending), steps last.
+    nodes.sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
+    return { rfNodes: nodes };
+  }, [spans, selectedId]);
 
-    const rfEdgesRaw: Edge[] = edges.map((e) => {
-      const isActive = selectedSpan
-        ? e.spans.some((s) => s.span_id === selectedSpan.span_id)
-        : false;
-      const swatchHex =
-        e.action === "chat"
-          ? DRIFT.driftViolet
-          : e.action === "invoke"
-            ? DRIFT.marigold
-            : e.action === "think"
-              ? DRIFT.plum
-              : DRIFT.lagoon;
-      return {
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        label: edgeLabel(e),
-        labelStyle: {
-          fill: DRIFT.linen,
-          fontSize: 10,
-          fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-        },
-        labelBgStyle: {
-          fill: DRIFT.deepIndigo,
-          fillOpacity: 0.92,
-        },
-        labelBgPadding: [6, 3],
-        labelBgBorderRadius: 4,
-        type: "smoothstep",
-        animated: isActive,
-        style: {
-          stroke: isActive ? DRIFT.marigold : swatchHex,
-          strokeWidth: isActive ? 2 : 1.4,
-          strokeOpacity: isActive ? 1 : 0.7,
-        },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          width: 18,
-          height: 18,
-          color: isActive ? DRIFT.marigold : swatchHex,
-        },
-      };
-    });
-
-    const laidOut = layout(nodesRaw, rfEdgesRaw);
-    const payloadMap: Record<string, EdgePayload> = {};
-    for (const e of edges) payloadMap[e.id] = { actionEdge: e };
-    return {
-      nodes: laidOut.nodes,
-      rfEdges: laidOut.edges,
-      edgePayload: payloadMap,
-    };
-  }, [entities, edges, selectedId, spans]);
-
-  if (entities.length === 0) {
-    return <div className="p-6 text-sm text-twilight">No entities to graph.</div>;
+  if (rfNodes.length === 0) {
+    return <div className="p-6 text-sm text-twilight">No spans to graph.</div>;
   }
-
-  const handleNodeClick = (entity: Entity) => {
-    if (entity.spans.length > 0) {
-      onSelect(entity.spans[0]);
-    }
-  };
-
-  const handleEdgeClick = (edgeId: string) => {
-    const payload = edgePayload[edgeId];
-    if (!payload) return;
-    const spans = payload.actionEdge.spans;
-    if (spans.length === 0) return;
-    // Cycle through spans if the selected one is already in this edge,
-    // else pick the first.
-    const currentIdx = spans.findIndex((s) => s.span_id === selectedId);
-    const next = spans[(currentIdx + 1) % spans.length];
-    onSelect(next);
-  };
 
   return (
     <div className="w-full h-full bg-midnight">
       <ReactFlow
-        nodes={nodes}
-        edges={rfEdges}
+        nodes={rfNodes}
+        edges={[]}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.15 }}
-        minZoom={0.2}
+        fitViewOptions={{ padding: 0.12 }}
+        minZoom={0.15}
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
-        onNodeClick={(_, n) => handleNodeClick((n.data as NodeData).entity)}
-        onEdgeClick={(_, e) => handleEdgeClick(e.id)}
+        onNodeClick={(_, n) => {
+          const layout = (n.data as StepData | FrameData).layout;
+          if (layout.span) onSelect(layout.span);
+        }}
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={true}
