@@ -54,9 +54,11 @@ def init(
     service_name = service_name or os.environ.get("LANGPERF_SERVICE_NAME", "langperf-agent")
     environment = environment or os.environ.get("LANGPERF_ENVIRONMENT")
 
-    # detect() reads the call stack. The caller of init() lives 2 frames above
-    # detect() (init → detect → inspect.stack, so the user's frame is index 2).
-    identity = detect_identity(caller_stack_offset=2)
+    # detect() reads the call stack. `_caller_info()` indexes inspect.stack()
+    # whose [0] frame is _caller_info itself, [1] is detect, [2] is init (here),
+    # [3] is the user script that called init. Use 3 so we fingerprint the user's
+    # caller, not our own init() frame.
+    identity = detect_identity(caller_stack_offset=3)
 
     resource_attrs: dict[str, object] = {
         "service.name": service_name,
