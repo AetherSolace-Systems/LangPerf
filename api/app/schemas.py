@@ -221,6 +221,13 @@ class OverviewResponse(BaseModel):
     most_ran_agents: list[MostRanAgent] = []
 
 
+class AgentPromptRow(BaseModel):
+    text: str
+    runs: int
+    first_seen_at: datetime
+    last_seen_at: datetime
+
+
 class AgentMiniMetrics(BaseModel):
     runs: int
     error_rate: float

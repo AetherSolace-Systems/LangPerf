@@ -18,6 +18,7 @@ from app.schemas import (
     AgentMiniMetrics,
     AgentMetrics,
     AgentPatch,
+    AgentPromptRow,
     AgentRunRow,
     AgentRunsResponse,
     AgentSummary,
@@ -396,3 +397,36 @@ async def get_agent_runs(
             )
         )
     return AgentRunsResponse(items=items, total=int(total), limit=limit, offset=offset)
+
+
+@router.get("/{name}/prompts", response_model=list[AgentPromptRow])
+async def get_agent_prompts(
+    name: str,
+    limit: int = Query(default=20, ge=1, le=100),
+    session: AsyncSession = Depends(get_session),
+) -> list[AgentPromptRow]:
+    agent = await _resolve_agent(session, name)
+    result = await session.execute(
+        select(
+            Trajectory.system_prompt.label("text"),
+            func.count().label("runs"),
+            func.min(Trajectory.started_at).label("first_seen_at"),
+            func.max(Trajectory.started_at).label("last_seen_at"),
+        )
+        .where(
+            Trajectory.agent_id == agent.id,
+            Trajectory.system_prompt.is_not(None),
+        )
+        .group_by(Trajectory.system_prompt)
+        .order_by(func.max(Trajectory.started_at).desc())
+        .limit(limit)
+    )
+    return [
+        AgentPromptRow(
+            text=row.text,
+            runs=int(row.runs),
+            first_seen_at=row.first_seen_at,
+            last_seen_at=row.last_seen_at,
+        )
+        for row in result
+    ]

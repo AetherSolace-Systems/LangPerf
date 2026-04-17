@@ -103,6 +103,7 @@ class Trajectory(Base):
     )
     status_tag: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    system_prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     step_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     token_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     duration_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)

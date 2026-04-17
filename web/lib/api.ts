@@ -276,6 +276,22 @@ export async function getAgentTools(
   );
 }
 
+export type AgentPromptRow = {
+  text: string;
+  runs: number;
+  first_seen_at: string;
+  last_seen_at: string;
+};
+
+export async function getAgentPrompts(
+  name: string,
+  limit = 20,
+): Promise<AgentPromptRow[]> {
+  return apiFetch<AgentPromptRow[]>(
+    `/api/agents/${encodeURIComponent(name)}/prompts?limit=${limit}`,
+  );
+}
+
 export async function getAgentRuns(
   name: string,
   opts: { limit?: number; offset?: number; environment?: string; version?: string } = {},

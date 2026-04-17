@@ -10,10 +10,12 @@ import { Chip } from "@/components/ui/chip";
 import {
   getAgent,
   getAgentMetrics,
+  getAgentPrompts,
   getAgentRuns,
   getAgentTools,
   type AgentDetail,
   type AgentMetrics,
+  type AgentPromptRow,
   type AgentRunsResponse,
   type AgentToolUsage,
   type TimeWindow,
@@ -23,6 +25,7 @@ import { RunsTable } from "@/components/agent/runs-table";
 import { VersionsTimeline } from "@/components/agent/versions-timeline";
 import { ToolsTable } from "@/components/agent/tools-table";
 import { ConfigForm } from "@/components/agent/config-form";
+import { PromptsView } from "@/components/agent/prompts-view";
 import { TopTools } from "@/components/dashboard/top-tools";
 import { TokensCostChart } from "@/components/charts/tokens-cost-chart";
 import { LineChart } from "@/components/charts/line-chart";
@@ -210,6 +213,7 @@ export default async function AgentTab({
   let metrics: AgentMetrics | null = null;
   let tools: AgentToolUsage[] = [];
   let runs: AgentRunsResponse | null = null;
+  let prompts: AgentPromptRow[] = [];
 
   if (tab === "overview") {
     try {
@@ -242,7 +246,16 @@ export default async function AgentTab({
       metrics = m;
       tools = t;
     } catch {}
-  } else if (tab === "versions" || tab === "config" || tab === "prompt") {
+  } else if (tab === "prompt") {
+    try {
+      const [m, p] = await Promise.all([
+        getAgentMetrics(name, window),
+        getAgentPrompts(name, 20),
+      ]);
+      metrics = m;
+      prompts = p;
+    } catch {}
+  } else if (tab === "versions" || tab === "config") {
     try {
       metrics = await getAgentMetrics(name, window);
     } catch {}
@@ -435,6 +448,8 @@ export default async function AgentTab({
         </Card>
       ) : tab === "config" ? (
         <ConfigForm agent={agent} />
+      ) : tab === "prompt" ? (
+        <PromptsView prompts={prompts} />
       ) : (
         <PromptPlaceholder name={name} />
       )}

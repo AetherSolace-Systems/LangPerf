@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Iterable
+from typing import Any, Iterable, Optional
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -198,6 +198,8 @@ async def _recompute_single(session: AsyncSession, traj_id: str) -> None:
         traj.duration_ms = int(
             (traj.ended_at - traj.started_at).total_seconds() * 1000
         )
+    if not traj.system_prompt:
+        traj.system_prompt = _extract_system_prompt(spans)
     session.add(traj)
     logger.debug(
         "recompute_totals traj=%s steps=%d tokens=%d duration=%sms",
@@ -210,3 +212,27 @@ async def _recompute_single(session: AsyncSession, traj_id: str) -> None:
 
 def _unix_nano_to_dt(unix_nano: int) -> datetime:
     return datetime.fromtimestamp(unix_nano / 1_000_000_000, tz=timezone.utc)
+
+
+_MAX_PROMPT_LEN = 16_384
+
+
+def _extract_system_prompt(spans: list[Span]) -> Optional[str]:
+    """Return the system prompt from the earliest LLM span that carries one.
+
+    OpenInference flattens messages into `llm.input_messages.<i>.message.role`
+    and `.content`. The system message is conventionally index 0, but some
+    frameworks put it elsewhere — scan all indices up to 8 to be safe.
+    """
+    llm_spans = [s for s in spans if (s.kind or "").lower() == "llm"]
+    llm_spans.sort(key=lambda s: s.started_at)
+    for span in llm_spans:
+        attrs = span.attributes or {}
+        for i in range(8):
+            role = attrs.get(f"llm.input_messages.{i}.message.role")
+            if role == "system":
+                content = attrs.get(f"llm.input_messages.{i}.message.content")
+                if isinstance(content, str) and content.strip():
+                    return content[:_MAX_PROMPT_LEN]
+                break
+    return None
