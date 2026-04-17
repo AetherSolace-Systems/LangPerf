@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
+from app.api.agents import router as agents_router
 from app.api.nodes import router as nodes_router
 from app.api.trajectories import router as trajectories_router
 from app.db import engine
@@ -91,3 +92,4 @@ async def healthz():
 app.include_router(otlp_router)
 app.include_router(trajectories_router)
 app.include_router(nodes_router)
+app.include_router(agents_router)

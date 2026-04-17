@@ -74,3 +74,45 @@ class FacetsResponse(BaseModel):
     services: list[str]
     environments: list[str]
     tags: list[str]
+
+
+# ── Agents ────────────────────────────────────────────────────────────────
+
+
+class AgentVersionSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    label: str
+    git_sha: Optional[str] = None
+    short_sha: Optional[str] = None
+    package_version: Optional[str] = None
+    first_seen_at: datetime
+    last_seen_at: datetime
+
+
+class AgentSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    display_name: Optional[str] = None
+    description: Optional[str] = None
+    owner: Optional[str] = None
+    github_url: Optional[str] = None
+    language: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AgentDetail(AgentSummary):
+    signature: str
+    versions: list[AgentVersionSummary] = []
+
+
+class AgentPatch(BaseModel):
+    display_name: Optional[str] = None
+    description: Optional[str] = None
+    owner: Optional[str] = None
+    github_url: Optional[str] = None
+    rename_to: Optional[str] = None
