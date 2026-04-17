@@ -3,15 +3,17 @@
 @tailwind utilities;
 
 :root {
-  /* Drift Signal palette */
-  --background: #14141F;     /* Midnight */
-  --surface: #1F2035;         /* Deep Indigo */
-  --foreground: #EDE7DD;      /* Linen */
-  --muted: #6E6F88;           /* Twilight */
-  --accent: #8B8CC7;          /* Drift Violet */
-  --accent-warm: #E5B754;     /* Marigold */
-  --border: #2B2B45;          /* subtle border derived from indigo */
-  --border-strong: #3A3B58;
+  /* Aether Dusk palette */
+  --background: #181D21;      /* Carbon */
+  --surface: #242D32;         /* Steel Mist */
+  --surface-2: #1F272B;       /* secondary surface — rail, identity strip */
+  --foreground: #F2EAE2;      /* Warm Fog */
+  --muted: #7A8B8E;           /* Patina */
+  --accent: #6BBAB1;          /* Aether Teal */
+  --accent-warm: #E8A87C;     /* Peach Neon */
+  --warn: #D98A6A;
+  --border: #2E3A40;
+  --border-strong: #3A4950;
 }
 
 html, body {
@@ -26,7 +28,7 @@ html, body {
 
 /* Selection uses the warm accent so it stands out on the dark indigo. */
 ::selection {
-  background: rgba(229, 183, 84, 0.3);
+  background: rgba(232, 168, 124, 0.3);
   color: var(--foreground);
 }
 
