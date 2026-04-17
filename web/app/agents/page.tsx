@@ -1,12 +1,69 @@
+import Link from "next/link";
 import { AppShell } from "@/components/shell/app-shell";
-import { ContextSidebar, CtxHeader, CtxItem } from "@/components/shell/context-sidebar";
+import {
+  ContextSidebar,
+  CtxHeader,
+  CtxItem,
+} from "@/components/shell/context-sidebar";
 import { Chip } from "@/components/ui/chip";
+import { listAgents, type AgentSummaryWithMetrics, type TimeWindow } from "@/lib/api";
+import { AgentGrid } from "@/components/dashboard/agent-grid";
+import { TimeRangePicker } from "@/components/agent/time-range-picker";
 
-export default function AgentsIndex() {
+export const dynamic = "force-dynamic";
+
+function parseWindow(v: string | undefined): TimeWindow {
+  if (v === "24h" || v === "30d") return v;
+  return "7d";
+}
+
+export default async function AgentsIndex({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
+  const params = await searchParams;
+  const window = parseWindow(params.window);
+
+  let agents: AgentSummaryWithMetrics[];
+  try {
+    agents = (await listAgents({ with_metrics: true, window })) as AgentSummaryWithMetrics[];
+  } catch (err) {
+    return (
+      <AppShell
+        topBar={{
+          breadcrumb: <span className="font-medium text-warm-fog">Agents</span>,
+        }}
+      >
+        <div
+          className="rounded border p-4 text-sm"
+          style={{
+            borderColor: "rgba(217,138,106,0.45)",
+            background: "rgba(217,138,106,0.1)",
+          }}
+        >
+          <p className="font-medium text-warn">Could not reach langperf-api</p>
+          <p className="mt-1 text-patina font-mono text-xs">
+            {err instanceof Error ? err.message : String(err)}
+          </p>
+        </div>
+      </AppShell>
+    );
+  }
+
   const sidebar = (
     <ContextSidebar>
       <CtxHeader action="+ new">Agents</CtxHeader>
-      <CtxItem>(lands in Phase 2)</CtxItem>
+      {agents.map((a) => (
+        <CtxItem key={a.id} sub={a.metrics.runs.toLocaleString()}>
+          <Link
+            href={`/agents/${encodeURIComponent(a.name)}`}
+            className="hover:underline"
+          >
+            {a.display_name ?? a.name}
+          </Link>
+        </CtxItem>
+      ))}
     </ContextSidebar>
   );
 
@@ -14,24 +71,16 @@ export default function AgentsIndex() {
     <AppShell
       topBar={{
         breadcrumb: <span className="font-medium text-warm-fog">Agents</span>,
-        right: <Chip>env: all</Chip>,
+        right: (
+          <>
+            <TimeRangePicker current={window} />
+            <Chip>env: all</Chip>
+          </>
+        ),
       }}
       contextSidebar={sidebar}
     >
-      <div className="border border-[color:var(--border)] border-l-2 border-l-peach-neon rounded-[3px] bg-[color:var(--surface)] p-[14px]">
-        <div className="font-mono text-[9px] text-peach-neon uppercase tracking-[0.1em] mb-[4px]">
-          phase 2
-        </div>
-        <div className="text-[13px] text-warm-fog mb-[4px]">
-          Agents become a first-class entity in Phase 2. The SDK will auto-detect each
-          agent from its source signature (git origin + init call site), and this page
-          will list every agent with live metrics.
-        </div>
-        <div className="text-[11px] text-patina leading-[1.5]">
-          Until then, agent metadata is effectively <code className="font-mono text-aether-teal">service_name</code> on
-          each run — visible on the History table.
-        </div>
-      </div>
+      <AgentGrid agents={agents} />
     </AppShell>
   );
 }
