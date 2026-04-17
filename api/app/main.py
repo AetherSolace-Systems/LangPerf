@@ -1,14 +1,17 @@
+import asyncio
 import logging
 import os
+import subprocess
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from app.api.nodes import router as nodes_router
 from app.api.trajectories import router as trajectories_router
 from app.db import engine
-from app.models import Base
 from app.otlp.receiver import router as otlp_router
 
 logging.basicConfig(
@@ -18,11 +21,47 @@ logging.basicConfig(
 logger = logging.getLogger("langperf")
 
 
+async def _is_pre_alembic_db() -> bool:
+    """Return True iff trajectories exists but alembic_version does not."""
+    async with engine.begin() as conn:
+        trajectories = (
+            await conn.execute(
+                text(
+                    "SELECT to_regclass('public.trajectories') IS NOT NULL AS present"
+                )
+            )
+        ).scalar_one()
+        alembic_version = (
+            await conn.execute(
+                text(
+                    "SELECT to_regclass('public.alembic_version') IS NOT NULL AS present"
+                )
+            )
+        ).scalar_one()
+    return bool(trajectories) and not bool(alembic_version)
+
+
+def _run_alembic(*args: str) -> None:
+    """Run an alembic CLI command in a subprocess to avoid asyncio loop conflicts.
+
+    env.py calls asyncio.run() at module level, which cannot be nested inside
+    the already-running FastAPI event loop — even via asyncio.to_thread the
+    inner loop's cleanup can deadlock.  A subprocess has its own interpreter
+    and event loop, so there is no conflict.
+    """
+    cmd = [sys.executable, "-m", "alembic", *args]
+    result = subprocess.run(cmd, capture_output=False, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"alembic {' '.join(args)} failed (exit {result.returncode})")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # v1 uses metadata.create_all() instead of Alembic — fine at dogfood scale.
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    if await _is_pre_alembic_db():
+        logger.info("pre-Alembic DB detected — stamping baseline (0001)")
+        await asyncio.to_thread(_run_alembic, "stamp", "0001")
+    logger.info("alembic upgrade head")
+    await asyncio.to_thread(_run_alembic, "upgrade", "head")
     logger.info("langperf-api ready")
     yield
     await engine.dispose()

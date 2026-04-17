@@ -27,6 +27,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Span, Trajectory
+from app.otlp.agent_resolver import resolve_agent_and_version
 from app.otlp.attrs import derive_kind, extract_token_count
 from app.otlp.decoder import DecodedBundle, DecodedSpan
 from app.otlp.grouping import (
@@ -130,6 +131,9 @@ async def _upsert_trajectory_for_span(
     service_name = resolve_service_name(resource_attrs)
     environment = resolve_environment(resource_attrs)
     name = resolve_trajectory_name(span, resource_attrs)
+    agent_id, agent_version_id = await resolve_agent_and_version(
+        session, resource_attrs
+    )
 
     values: dict[str, Any] = {
         "id": traj_id,
@@ -142,15 +146,14 @@ async def _upsert_trajectory_for_span(
         "step_count": 0,
         "token_count": 0,
         "duration_ms": None,
+        "agent_id": agent_id,
+        "agent_version_id": agent_version_id,
     }
 
-    # Do-nothing on conflict at insert; we widen the window via UPDATE below.
     stmt = pg_insert(Trajectory).values(**values)
     stmt = stmt.on_conflict_do_nothing(index_elements=[Trajectory.id])
     await session.execute(stmt)
 
-    # For an existing row, widen started_at downward, ended_at upward, and
-    # fill in name/environment if they weren't known before.
     existing = await session.get(Trajectory, traj_id)
     if existing:
         changed = False
@@ -167,6 +170,12 @@ async def _upsert_trajectory_for_span(
             changed = True
         if environment and not existing.environment:
             existing.environment = environment
+            changed = True
+        if agent_id and not existing.agent_id:
+            existing.agent_id = agent_id
+            changed = True
+        if agent_version_id and not existing.agent_version_id:
+            existing.agent_version_id = agent_version_id
             changed = True
         if changed:
             session.add(existing)
