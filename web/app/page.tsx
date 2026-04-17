@@ -1,66 +1,226 @@
 import Link from "next/link";
 import { AppShell } from "@/components/shell/app-shell";
-import { ContextSidebar, CtxHeader, CtxItem } from "@/components/shell/context-sidebar";
+import {
+  ContextSidebar,
+  CtxHeader,
+  CtxItem,
+} from "@/components/shell/context-sidebar";
 import { Chip } from "@/components/ui/chip";
+import {
+  getOverview,
+  listAgents,
+  type AgentSummaryWithMetrics,
+  type OverviewResponse,
+  type TimeWindow,
+} from "@/lib/api";
+import { KpiStrip } from "@/components/dashboard/kpi-strip";
+import { AgentGrid } from "@/components/dashboard/agent-grid";
+import { TopTools } from "@/components/dashboard/top-tools";
+import { RecentFlagged } from "@/components/dashboard/recent-flagged";
+import { ToolAgentHeatmap } from "@/components/dashboard/tool-agent-heatmap";
+import { EnvSplitCard } from "@/components/dashboard/env-split";
+import { StackedBarChart } from "@/components/charts/bar-chart";
+import { LineChart } from "@/components/charts/line-chart";
+import { TimeRangePicker } from "@/components/agent/time-range-picker";
 
 export const dynamic = "force-dynamic";
 
-function KpiTile({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Card({
+  title,
+  right,
+  children,
+  className = "",
+}: {
+  title?: string;
+  right?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="border border-[color:var(--border)] rounded-[3px] bg-[color:var(--surface)] p-[10px]">
-      <div className="font-mono text-[9px] text-patina uppercase tracking-[0.1em] mb-[6px]">
-        {label}
-      </div>
-      <div className="font-mono text-[20px] text-warm-fog tracking-[-0.02em]">{value}</div>
-      {sub ? (
-        <div className="font-mono text-[10px] text-patina mt-[3px]">{sub}</div>
+    <div className={`border border-[color:var(--border)] rounded-[3px] bg-[color:var(--surface)] p-[12px] ${className}`}>
+      {title ? (
+        <div className="flex items-center justify-between mb-[8px]">
+          <span className="font-mono text-[9px] text-patina uppercase tracking-[0.1em]">
+            {title}
+          </span>
+          {right ? (
+            <span className="font-mono text-[10px] text-aether-teal">{right}</span>
+          ) : null}
+        </div>
       ) : null}
+      {children}
     </div>
   );
 }
 
-export default function Dashboard() {
+function V2Card({ label, body }: { label: string; body: string }) {
+  return (
+    <div className="border border-[color:var(--border)] border-l-2 border-l-peach-neon rounded-[3px] bg-[color:var(--surface)] p-[10px]">
+      <div className="font-mono text-[9px] text-peach-neon uppercase tracking-[0.1em] mb-[4px]">
+        v2
+      </div>
+      <div className="text-[12px] text-warm-fog font-medium mb-[2px]">{label}</div>
+      <div className="text-[11px] text-patina leading-[1.5]">{body}</div>
+    </div>
+  );
+}
+
+function parseWindow(v: string | undefined): TimeWindow {
+  if (v === "24h" || v === "30d") return v;
+  return "7d";
+}
+
+export default async function Dashboard({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
+  const params = await searchParams;
+  const window = parseWindow(params.window);
+
+  let overview: OverviewResponse;
+  let agents: AgentSummaryWithMetrics[];
+  try {
+    const [ov, ag] = await Promise.all([
+      getOverview(window),
+      listAgents({ with_metrics: true, window }),
+    ]);
+    overview = ov;
+    agents = ag as AgentSummaryWithMetrics[];
+  } catch (err) {
+    return (
+      <AppShell
+        topBar={{
+          breadcrumb: (
+            <span className="font-medium text-warm-fog">Dashboard</span>
+          ),
+        }}
+      >
+        <div
+          className="rounded border p-4 text-sm"
+          style={{
+            borderColor: "rgba(217,138,106,0.45)",
+            background: "rgba(217,138,106,0.1)",
+          }}
+        >
+          <p className="font-medium text-warn">Could not reach langperf-api</p>
+          <p className="mt-1 text-patina font-mono text-xs">
+            {err instanceof Error ? err.message : String(err)}
+          </p>
+        </div>
+      </AppShell>
+    );
+  }
+
   const sidebar = (
     <ContextSidebar>
       <CtxHeader>Pinned agents</CtxHeader>
-      <CtxItem>(lands in Phase 2)</CtxItem>
+      {agents.slice(0, 6).map((a) => (
+        <CtxItem key={a.id} sub={a.metrics.runs.toLocaleString()}>
+          <Link
+            href={`/agents/${encodeURIComponent(a.name)}`}
+            className="hover:underline"
+          >
+            {a.display_name ?? a.name}
+          </Link>
+        </CtxItem>
+      ))}
       <CtxHeader>Saved views</CtxHeader>
-      <CtxItem>(lands in Phase 2)</CtxItem>
+      <CtxItem>(Phase 4)</CtxItem>
     </ContextSidebar>
   );
+
+  const volumeBars = overview.volume_by_day.map((d) => {
+    const date = new Date(d.day);
+    const label = date.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase();
+    return {
+      label,
+      segments: [
+        { color: "#6BBAB1", value: d.prod },
+        { color: "#E8A87C", value: d.staging },
+        { color: "#7A8B8E", value: d.dev + d.other },
+      ],
+    };
+  });
+
+  const flat = (v: number | null) => (v == null ? [] : Array(7).fill(v));
+  const latencyTicks = (() => {
+    const p99 = overview.kpi.p99_latency_ms ?? 1000;
+    const rounded = Math.max(1000, Math.ceil(p99 / 1000) * 1000);
+    const step = rounded / 4;
+    return [0, step, step * 2, step * 3, step * 4];
+  })();
 
   return (
     <AppShell
       topBar={{
         breadcrumb: <span className="font-medium text-warm-fog">Dashboard</span>,
-        right: <Chip variant="primary">ingest ok</Chip>,
+        right: (
+          <>
+            <TimeRangePicker current={window} />
+            <Chip variant="primary">ingest ok</Chip>
+          </>
+        ),
       }}
       contextSidebar={sidebar}
     >
-      <div className="grid grid-cols-5 gap-[8px] mb-[10px]">
-        <KpiTile label="runs · 7d" value="—" sub="wait for Phase 2" />
-        <KpiTile label="agents" value="—" sub="wait for Phase 2" />
-        <KpiTile label="error rate" value="—" />
-        <KpiTile label="p95 latency" value="—" />
-        <KpiTile label="flagged" value="—" />
+      <KpiStrip kpi={overview.kpi} window={window} />
+
+      <div className="grid grid-cols-[2fr_1fr] gap-[8px] mb-[10px]">
+        <Card title={`Run volume · ${window} · by env`}>
+          <StackedBarChart bars={volumeBars} />
+        </Card>
+        <Card title={`Latency · p50/p95/p99 · ${window}`}>
+          <LineChart
+            lines={[
+              { name: "p50", color: "#E8A87C", values: flat(overview.kpi.p50_latency_ms) },
+              { name: "p95", color: "#6BBAB1", values: flat(overview.kpi.p95_latency_ms) },
+              { name: "p99", color: "#D98A6A", values: flat(overview.kpi.p99_latency_ms) },
+            ]}
+            xLabels={["start", "", "", "", "now"]}
+            yTicks={latencyTicks}
+            yFormat={(v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${v}ms`)}
+          />
+        </Card>
       </div>
 
-      <div className="border border-[color:var(--border)] border-l-2 border-l-peach-neon rounded-[3px] bg-[color:var(--surface)] p-[14px]">
-        <div className="font-mono text-[9px] text-peach-neon uppercase tracking-[0.1em] mb-[4px]">
-          phase 1 · the shell is ready
-        </div>
-        <div className="text-[13px] text-warm-fog mb-[4px]">
-          Charts, agent grid, top tools, heatmap, and flagged runs arrive in Phase 2
-          (first-class Agent data model).
-        </div>
-        <div className="text-[11px] text-patina leading-[1.5]">
-          Meanwhile the existing trajectory list is available at{" "}
-          <Link href="/history" className="text-aether-teal hover:underline">
-            /history
-          </Link>
-          . OTLP ingestion at{" "}
-          <code className="font-mono text-aether-teal">POST /v1/traces</code> is unchanged.
-        </div>
+      <div className="grid grid-cols-[1.2fr_1fr_0.8fr] gap-[8px] mb-[10px]">
+        <Card title={`Top tools · ${window}`} right="across all agents">
+          <TopTools tools={overview.top_tools} />
+        </Card>
+        <Card title="Tool-by-agent heatmap">
+          <ToolAgentHeatmap cells={overview.heatmap} />
+        </Card>
+        <Card title="Env split">
+          <EnvSplitCard entries={overview.env_split} />
+        </Card>
+      </div>
+
+      <Card title="Your agents">
+        <AgentGrid agents={agents} />
+      </Card>
+
+      <div className="h-[10px]" />
+
+      <Card title="Recent flagged" right={<Link href="/history">view history →</Link>}>
+        <RecentFlagged rows={overview.recent_flagged} />
+      </Card>
+
+      <div className="h-[10px]" />
+
+      <div className="grid grid-cols-3 gap-[8px]">
+        <V2Card
+          label="Triage queue"
+          body="Priority-ordered runs needing review. Clustered failures across agents."
+        />
+        <V2Card
+          label="Eval regressions"
+          body="Which prompts/tools regressed against your eval set this week."
+        />
+        <V2Card
+          label="Training data export"
+          body="Flagged + corrected runs as SFT/DPO jsonl from this surface."
+        />
       </div>
     </AppShell>
   );
