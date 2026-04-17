@@ -147,6 +147,14 @@ class AgentRunRow(BaseModel):
     name: Optional[str]
     environment: Optional[str]
     version_label: Optional[str]
+    agent_name: Optional[str] = None
+
+
+class RunsResponse(BaseModel):
+    items: list[AgentRunRow]
+    total: int
+    limit: int
+    offset: int
 
 
 class AgentRunsResponse(BaseModel):

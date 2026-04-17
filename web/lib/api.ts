@@ -175,6 +175,7 @@ export type AgentRunRow = {
   name: string | null;
   environment: string | null;
   version_label: string | null;
+  agent_name?: string | null;
 };
 
 export type AgentRunsResponse = {
@@ -282,6 +283,25 @@ export type AgentPromptRow = {
   first_seen_at: string;
   last_seen_at: string;
 };
+
+export type RunsResponse = AgentRunsResponse;
+
+export async function listRuns(opts: {
+  pattern?: string;
+  tag?: string;
+  q?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<RunsResponse> {
+  const p = new URLSearchParams();
+  if (opts.pattern) p.set("pattern", opts.pattern);
+  if (opts.tag) p.set("tag", opts.tag);
+  if (opts.q) p.set("q", opts.q);
+  if (opts.limit != null) p.set("limit", String(opts.limit));
+  if (opts.offset != null) p.set("offset", String(opts.offset));
+  const q = p.toString();
+  return apiFetch<RunsResponse>(`/api/runs${q ? `?${q}` : ""}`);
+}
 
 export async function getAgentPrompts(
   name: string,

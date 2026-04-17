@@ -1,63 +1,31 @@
 import Link from "next/link";
-import {
-  getFacets,
-  listTrajectories,
-  type TrajectorySummary,
-} from "@/lib/api";
-import { ClientTime } from "@/components/client-time";
-import { FilterBar } from "@/components/filter-bar";
-import { tagSwatch } from "@/lib/colors";
-import { fmtDuration } from "@/lib/format";
 import { AppShell } from "@/components/shell/app-shell";
-import { ContextSidebar, CtxHeader, CtxItem } from "@/components/shell/context-sidebar";
+import {
+  ContextSidebar,
+  CtxHeader,
+  CtxItem,
+} from "@/components/shell/context-sidebar";
 import { Chip } from "@/components/ui/chip";
+import { listRuns, type AgentRunsResponse } from "@/lib/api";
+import { RunsTable } from "@/components/agent/runs-table";
+import { PatternInput } from "@/components/history/pattern-input";
 
 export const dynamic = "force-dynamic";
 
-function Row({ t }: { t: TrajectorySummary }) {
-  const swatch = tagSwatch(t.status_tag);
-  return (
-    <Link
-      href={`/t/${t.id}`}
-      className="block border-b border-[color:var(--border)] px-4 py-3 hover:bg-linen/[0.03] transition-colors"
-    >
-      <div className="flex items-center gap-3">
-        <span className="font-mono text-xs text-twilight w-28 truncate">
-          {t.id.slice(0, 8)}…
-        </span>
-        <span className="text-sm flex-1 truncate">
-          {t.name ?? <em className="text-twilight">(unnamed)</em>}
-        </span>
-        <span
-          className="text-[10px] font-mono uppercase tracking-wider border rounded px-1.5 py-0.5"
-          style={{
-            color: t.status_tag ? swatch.fg : "var(--muted)",
-            background: t.status_tag ? swatch.bg : "transparent",
-            borderColor: t.status_tag ? swatch.border : "var(--border)",
-          }}
-        >
-          {t.status_tag ?? "—"}
-        </span>
-        <span className="text-xs text-twilight w-32 text-right truncate">
-          {t.service_name}
-          {t.environment ? ` · ${t.environment}` : ""}
-        </span>
-        <span className="text-xs text-twilight w-20 text-right tabular-nums">
-          {t.step_count} step{t.step_count === 1 ? "" : "s"}
-        </span>
-        <span className="text-xs text-twilight w-20 text-right tabular-nums">
-          {t.token_count.toLocaleString()}t
-        </span>
-        <span className="text-xs text-twilight w-16 text-right tabular-nums">
-          {fmtDuration(t.duration_ms)}
-        </span>
-        <span className="text-xs text-twilight w-36 text-right">
-          <ClientTime iso={t.started_at} />
-        </span>
-      </div>
-    </Link>
-  );
-}
+const SAVED_PATTERNS = [
+  "*.*.*",
+  "*.prod.*",
+  "*.staging.*",
+  "*.dev.*",
+  "weather-*.*.*",
+  "code-*.*.*",
+];
+
+const QUICK_FILTERS: Array<{ label: string; params: Record<string, string> }> = [
+  { label: "flagged only", params: { tag: "bad" } },
+  { label: "good only", params: { tag: "good" } },
+  { label: "interesting", params: { tag: "interesting" } },
+];
 
 export default async function History({
   searchParams,
@@ -65,20 +33,13 @@ export default async function History({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const params = await searchParams;
+  const pattern = params.pattern ?? "";
+  const tag = params.tag ?? undefined;
+  const q = params.q ?? undefined;
 
-  let data;
-  let facets;
+  let runs: AgentRunsResponse;
   try {
-    [data, facets] = await Promise.all([
-      listTrajectories({
-        limit: 100,
-        tag: params.tag,
-        service: params.service,
-        environment: params.environment,
-        q: params.q,
-      }),
-      getFacets(),
-    ]);
+    runs = await listRuns({ pattern, tag, q, limit: 100 });
   } catch (err) {
     return (
       <AppShell
@@ -102,16 +63,55 @@ export default async function History({
     );
   }
 
-  const hasFilters = Object.values(params).some(Boolean);
+  const hasFilters = Boolean(pattern || tag || q);
 
   const sidebar = (
     <ContextSidebar>
       <CtxHeader>Saved patterns</CtxHeader>
-      <CtxItem>(none yet — lands in Phase 4)</CtxItem>
+      {SAVED_PATTERNS.map((p) => {
+        const active = p === pattern;
+        return (
+          <Link
+            key={p}
+            href={`/history?pattern=${encodeURIComponent(p)}`}
+            className={`block px-[6px] py-[5px] rounded-[2px] text-[12px] my-[1px] font-mono ${
+              active
+                ? "bg-[color:rgba(107,186,177,0.07)] text-aether-teal"
+                : "text-warm-fog hover:text-aether-teal"
+            }`}
+          >
+            {p}
+          </Link>
+        );
+      })}
       <CtxHeader>Quick filters</CtxHeader>
-      <CtxItem>• flagged · 24h</CtxItem>
-      <CtxItem>• errors only</CtxItem>
-      <CtxItem>• new agents</CtxItem>
+      {QUICK_FILTERS.map((f) => {
+        const qp = new URLSearchParams(f.params).toString();
+        const active = Object.entries(f.params).every(
+          ([k, v]) => params[k] === v,
+        );
+        return (
+          <Link
+            key={f.label}
+            href={`/history?${qp}`}
+            className={`block px-[6px] py-[5px] rounded-[2px] text-[12px] my-[1px] ${
+              active
+                ? "bg-[color:rgba(107,186,177,0.07)] text-aether-teal"
+                : "text-warm-fog hover:text-aether-teal"
+            }`}
+          >
+            {f.label}
+          </Link>
+        );
+      })}
+      {hasFilters ? (
+        <Link
+          href="/history"
+          className="block mt-[10px] px-[6px] py-[5px] text-[10px] font-mono text-patina hover:text-warm-fog uppercase tracking-[0.08em]"
+        >
+          clear all →
+        </Link>
+      ) : null}
     </ContextSidebar>
   );
 
@@ -122,8 +122,8 @@ export default async function History({
         right: (
           <>
             <Chip>
-              {data.total} run{data.total === 1 ? "" : "s"}
-              {hasFilters ? " (filtered)" : ""}
+              {runs.total.toLocaleString()} run{runs.total === 1 ? "" : "s"}
+              {hasFilters ? " · filtered" : ""}
             </Chip>
             <Chip variant="primary">ingest ok</Chip>
           </>
@@ -131,35 +131,25 @@ export default async function History({
       }}
       contextSidebar={sidebar}
     >
-      <FilterBar facets={facets} />
-      {data.items.length === 0 ? (
-        <div className="p-10 text-sm text-patina">
-          {hasFilters ? (
-            <p>No runs match these filters.</p>
-          ) : (
-            <>
-              <p>No runs yet.</p>
-              <p className="mt-2">
-                Send OTLP spans to{" "}
-                <code className="font-mono text-aether-teal">
-                  POST http://localhost:4318/v1/traces
-                </code>{" "}
-                — or run{" "}
-                <code className="font-mono">
-                  python scripts/seed_demo_data.py
-                </code>
-                .
-              </p>
-            </>
-          )}
+      <div className="flex items-start gap-[8px] mb-[10px]">
+        <PatternInput current={pattern} />
+      </div>
+      <div className="font-mono text-[10px] text-patina mb-[10px] px-[2px]">
+        <span className="text-aether-teal">pattern</span> — dot-delimited{" "}
+        <code>agent.env.version</code> · <code>*</code> wildcards · missing
+        trailing segments default to <code>*</code>
+      </div>
+
+      <div className="border border-[color:var(--border)] rounded-[3px] bg-[color:var(--surface)] overflow-hidden">
+        <RunsTable rows={runs.items} showAgent />
+      </div>
+
+      {runs.total > runs.items.length ? (
+        <div className="text-center text-patina font-mono text-[10px] py-[10px]">
+          showing {runs.items.length.toLocaleString()} of{" "}
+          {runs.total.toLocaleString()}
         </div>
-      ) : (
-        <div>
-          {data.items.map((t) => (
-            <Row key={t.id} t={t} />
-          ))}
-        </div>
-      )}
+      ) : null}
     </AppShell>
   );
 }

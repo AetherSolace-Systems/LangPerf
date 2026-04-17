@@ -11,7 +11,13 @@ function tagCls(tag: string | null): string {
   return "text-patina border-[color:var(--border-strong)]";
 }
 
-export function RunsTable({ rows }: { rows: AgentRunRow[] }) {
+export function RunsTable({
+  rows,
+  showAgent = false,
+}: {
+  rows: AgentRunRow[];
+  showAgent?: boolean;
+}) {
   if (rows.length === 0) {
     return <div className="text-patina text-[12px] p-[16px]">No runs.</div>;
   }
@@ -21,6 +27,7 @@ export function RunsTable({ rows }: { rows: AgentRunRow[] }) {
         <tr>
           <Th>Time</Th>
           <Th>ID</Th>
+          {showAgent ? <Th>Agent</Th> : null}
           <Th>Input</Th>
           <Th className="text-right">Steps</Th>
           <Th className="text-right">Tokens</Th>
@@ -44,6 +51,20 @@ export function RunsTable({ rows }: { rows: AgentRunRow[] }) {
                 {r.id.slice(0, 6)}
               </Link>
             </Td>
+            {showAgent ? (
+              <Td>
+                {r.agent_name ? (
+                  <Link
+                    href={`/agents/${encodeURIComponent(r.agent_name)}`}
+                    className="text-aether-teal hover:underline"
+                  >
+                    {r.agent_name}
+                  </Link>
+                ) : (
+                  <span className="text-patina">—</span>
+                )}
+              </Td>
+            ) : null}
             <Td>
               <span className="truncate inline-block max-w-[360px] align-bottom">
                 {r.name ?? <em className="text-patina">(unnamed)</em>}

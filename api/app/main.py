@@ -12,6 +12,7 @@ from sqlalchemy import text
 from app.api.agents import router as agents_router
 from app.api.nodes import router as nodes_router
 from app.api.overview import router as overview_router
+from app.api.runs import router as runs_router
 from app.api.trajectories import router as trajectories_router
 from app.db import engine
 from app.otlp.receiver import router as otlp_router
@@ -95,3 +96,4 @@ app.include_router(trajectories_router)
 app.include_router(nodes_router)
 app.include_router(agents_router)
 app.include_router(overview_router)
+app.include_router(runs_router)
