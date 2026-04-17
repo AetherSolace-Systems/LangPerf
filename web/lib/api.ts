@@ -103,3 +103,183 @@ export async function getTrajectory(id: string): Promise<TrajectoryDetail> {
 export async function getFacets(): Promise<FacetsResponse> {
   return apiFetch<FacetsResponse>(`/api/trajectories/facets`);
 }
+
+// ── Agents (Phase 2b) ─────────────────────────────────────────────────
+
+export type AgentMiniMetrics = {
+  runs: number;
+  error_rate: number;
+  p95_latency_ms: number | null;
+};
+
+export type AgentSummary = {
+  id: string;
+  name: string;
+  display_name: string | null;
+  description: string | null;
+  owner: string | null;
+  github_url: string | null;
+  language: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AgentSummaryWithMetrics = AgentSummary & {
+  metrics: AgentMiniMetrics;
+  sparkline: number[];
+  version_count: number;
+  environments: string[];
+};
+
+export type AgentVersionSummary = {
+  id: string;
+  label: string;
+  git_sha: string | null;
+  short_sha: string | null;
+  package_version: string | null;
+  first_seen_at: string;
+  last_seen_at: string;
+};
+
+export type AgentDetail = AgentSummary & {
+  signature: string;
+  versions: AgentVersionSummary[];
+};
+
+export type AgentMetrics = {
+  agent: string;
+  window: string;
+  runs: number;
+  errors: number;
+  error_rate: number;
+  p50_latency_ms: number | null;
+  p95_latency_ms: number | null;
+  p99_latency_ms: number | null;
+  total_tokens: number;
+};
+
+export type AgentToolUsage = {
+  tool: string;
+  calls: number;
+  errors: number;
+};
+
+export type AgentRunRow = {
+  id: string;
+  started_at: string;
+  ended_at: string | null;
+  duration_ms: number | null;
+  step_count: number;
+  token_count: number;
+  status_tag: string | null;
+  name: string | null;
+  environment: string | null;
+  version_label: string | null;
+};
+
+export type AgentRunsResponse = {
+  items: AgentRunRow[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+// ── Overview (dashboard) ──────────────────────────────────────────────
+
+export type OverviewKpi = {
+  runs: number;
+  agents: number;
+  error_rate: number;
+  p50_latency_ms: number | null;
+  p95_latency_ms: number | null;
+  p99_latency_ms: number | null;
+  flagged: number;
+  total_tokens: number;
+};
+
+export type VolumeDay = {
+  day: string;
+  prod: number;
+  staging: number;
+  dev: number;
+  other: number;
+};
+
+export type EnvSplit = { environment: string; runs: number };
+export type TopTool = { tool: string; calls: number; errors: number };
+export type FlaggedRun = {
+  id: string;
+  started_at: string;
+  duration_ms: number | null;
+  status_tag: string | null;
+  agent_name: string | null;
+  summary: string | null;
+};
+export type HeatmapCell = { agent_name: string; tool: string; calls: number };
+
+export type OverviewResponse = {
+  window: string;
+  kpi: OverviewKpi;
+  volume_by_day: VolumeDay[];
+  env_split: EnvSplit[];
+  top_tools: TopTool[];
+  recent_flagged: FlaggedRun[];
+  heatmap: HeatmapCell[];
+};
+
+export type TimeWindow = "24h" | "7d" | "30d";
+
+// ── Fetch functions ───────────────────────────────────────────────────
+
+export async function getOverview(window: TimeWindow = "7d"): Promise<OverviewResponse> {
+  return apiFetch<OverviewResponse>(`/api/overview?window=${window}`);
+}
+
+export async function listAgents(
+  opts: { with_metrics?: boolean; window?: TimeWindow } = {},
+): Promise<AgentSummary[] | AgentSummaryWithMetrics[]> {
+  const p = new URLSearchParams();
+  if (opts.with_metrics) p.set("with_metrics", "true");
+  if (opts.window) p.set("window", opts.window);
+  const q = p.toString();
+  return apiFetch<AgentSummary[] | AgentSummaryWithMetrics[]>(
+    `/api/agents${q ? `?${q}` : ""}`,
+  );
+}
+
+export async function getAgent(name: string): Promise<AgentDetail> {
+  return apiFetch<AgentDetail>(`/api/agents/${encodeURIComponent(name)}`);
+}
+
+export async function getAgentMetrics(
+  name: string,
+  window: TimeWindow = "7d",
+): Promise<AgentMetrics> {
+  return apiFetch<AgentMetrics>(
+    `/api/agents/${encodeURIComponent(name)}/metrics?window=${window}`,
+  );
+}
+
+export async function getAgentTools(
+  name: string,
+  window: TimeWindow = "7d",
+): Promise<AgentToolUsage[]> {
+  return apiFetch<AgentToolUsage[]>(
+    `/api/agents/${encodeURIComponent(name)}/tools?window=${window}`,
+  );
+}
+
+export async function getAgentRuns(
+  name: string,
+  opts: { limit?: number; offset?: number; environment?: string; version?: string } = {},
+): Promise<AgentRunsResponse> {
+  const p = new URLSearchParams();
+  if (opts.limit != null) p.set("limit", String(opts.limit));
+  if (opts.offset != null) p.set("offset", String(opts.offset));
+  if (opts.environment) p.set("environment", opts.environment);
+  if (opts.version) p.set("version", opts.version);
+  const q = p.toString();
+  return apiFetch<AgentRunsResponse>(
+    `/api/agents/${encodeURIComponent(name)}/runs${q ? `?${q}` : ""}`,
+  );
+}
