@@ -23,6 +23,7 @@ services:
       - "4318:4318"
     volumes:
       - ./api/app:/app/app
+      - ./api/alembic:/app/alembic
     depends_on:
       postgres:
         condition: service_healthy
