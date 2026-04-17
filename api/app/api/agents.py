@@ -13,6 +13,7 @@ from sqlalchemy.orm import selectinload
 
 from app.db import get_session
 from app.models import Agent, AgentVersion, Span, Trajectory
+from app.otlp.latency_series import latency_series
 from app.schemas import (
     AgentDetail,
     AgentMiniMetrics,
@@ -300,6 +301,8 @@ async def get_agent_metrics(
             return None
         return int(x)
 
+    latency = await latency_series(session, window=window, agent_id=agent.id)
+
     return AgentMetrics(
         agent=agent.name,
         window=window,
@@ -310,6 +313,7 @@ async def get_agent_metrics(
         p95_latency_ms=_to_int(p_rows.p95),
         p99_latency_ms=_to_int(p_rows.p99),
         total_tokens=int(total_tokens),
+        latency_series=latency,
     )
 
 

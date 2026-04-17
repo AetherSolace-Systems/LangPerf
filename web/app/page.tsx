@@ -143,12 +143,27 @@ export default async function Dashboard({
     };
   });
 
-  const flat = (v: number | null) => (v == null ? [] : Array(7).fill(v));
+  const latencySeries = overview.latency_series ?? [];
   const latencyTicks = (() => {
-    const p99 = overview.kpi.p99_latency_ms ?? 1000;
-    const rounded = Math.max(1000, Math.ceil(p99 / 1000) * 1000);
+    const maxFromSeries = latencySeries.reduce(
+      (m, p) => Math.max(m, p.p99_latency_ms ?? 0),
+      overview.kpi.p99_latency_ms ?? 0,
+    );
+    const rounded = Math.max(1000, Math.ceil((maxFromSeries || 1000) / 1000) * 1000);
     const step = rounded / 4;
     return [0, step, step * 2, step * 3, step * 4];
+  })();
+  const latencyXLabels = (() => {
+    const len = latencySeries.length;
+    if (len === 0) return ["start", "", "", "", "now"];
+    const first = new Date(latencySeries[0].bucket_start);
+    const last = new Date(latencySeries[len - 1].bucket_start);
+    const fmt = (d: Date) =>
+      window === "24h"
+        ? `${String(d.getHours()).padStart(2, "0")}:00`
+        : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const mid = new Date(latencySeries[Math.floor(len / 2)].bucket_start);
+    return [fmt(first), "", fmt(mid), "", fmt(last)];
   })();
 
   return (
@@ -173,11 +188,11 @@ export default async function Dashboard({
         <Card title={`Latency · p50/p95/p99 · ${window}`}>
           <LineChart
             lines={[
-              { name: "p50", color: "#E8A87C", values: flat(overview.kpi.p50_latency_ms) },
-              { name: "p95", color: "#6BBAB1", values: flat(overview.kpi.p95_latency_ms) },
-              { name: "p99", color: "#D98A6A", values: flat(overview.kpi.p99_latency_ms) },
+              { name: "p50", color: "#E8A87C", values: latencySeries.map((p) => p.p50_latency_ms) },
+              { name: "p95", color: "#6BBAB1", values: latencySeries.map((p) => p.p95_latency_ms) },
+              { name: "p99", color: "#D98A6A", values: latencySeries.map((p) => p.p99_latency_ms) },
             ]}
-            xLabels={["start", "", "", "", "now"]}
+            xLabels={latencyXLabels}
             yTicks={latencyTicks}
             yFormat={(v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${v}ms`)}
           />

@@ -156,6 +156,7 @@ export type AgentMetrics = {
   p95_latency_ms: number | null;
   p99_latency_ms: number | null;
   total_tokens: number;
+  latency_series?: LatencyPoint[];
 };
 
 export type AgentToolUsage = {
@@ -186,6 +187,14 @@ export type AgentRunsResponse = {
 };
 
 // ── Overview (dashboard) ──────────────────────────────────────────────
+
+export type LatencyPoint = {
+  bucket_start: string;
+  runs: number;
+  p50_latency_ms: number | null;
+  p95_latency_ms: number | null;
+  p99_latency_ms: number | null;
+};
 
 export type OverviewKpi = {
   runs: number;
@@ -233,6 +242,7 @@ export type OverviewResponse = {
   recent_flagged: FlaggedRun[];
   heatmap: HeatmapCell[];
   most_ran_agents: MostRanAgent[];
+  latency_series?: LatencyPoint[];
 };
 
 export type TimeWindow = "24h" | "7d" | "30d";

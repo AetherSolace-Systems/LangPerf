@@ -124,6 +124,14 @@ class AgentToolUsage(BaseModel):
     errors: int
 
 
+class LatencyPoint(BaseModel):
+    bucket_start: datetime
+    runs: int
+    p50_latency_ms: Optional[int]
+    p95_latency_ms: Optional[int]
+    p99_latency_ms: Optional[int]
+
+
 class AgentMetrics(BaseModel):
     agent: str
     window: str  # "24h" | "7d" | "30d"
@@ -134,6 +142,7 @@ class AgentMetrics(BaseModel):
     p95_latency_ms: Optional[int]
     p99_latency_ms: Optional[int]
     total_tokens: int
+    latency_series: list[LatencyPoint] = []
 
 
 class AgentRunRow(BaseModel):
@@ -227,6 +236,7 @@ class OverviewResponse(BaseModel):
     recent_flagged: list[FlaggedRun]
     heatmap: list[HeatmapCell] = []  # deprecated; UI no longer renders
     most_ran_agents: list[MostRanAgent] = []
+    latency_series: list[LatencyPoint] = []
 
 
 class AgentPromptRow(BaseModel):

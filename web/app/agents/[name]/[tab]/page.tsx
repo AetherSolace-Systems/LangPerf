@@ -123,15 +123,32 @@ function KpiTile({
   );
 }
 
-function flat(v: number | null): number[] {
-  return v == null ? [] : [v, v, v, v, v, v, v];
-}
-
 function latencyTicks(m: AgentMetrics | null): number[] {
-  const p99 = m?.p99_latency_ms ?? 1000;
-  const rounded = Math.max(1000, Math.ceil(p99 / 1000) * 1000);
+  const seriesMax = (m?.latency_series ?? []).reduce(
+    (acc, p) => Math.max(acc, p.p99_latency_ms ?? 0),
+    m?.p99_latency_ms ?? 0,
+  );
+  const rounded = Math.max(1000, Math.ceil((seriesMax || 1000) / 1000) * 1000);
   const step = rounded / 4;
   return [0, step, step * 2, step * 3, step * 4];
+}
+
+function latencyXLabels(m: AgentMetrics | null, window: TimeWindow): string[] {
+  const series = m?.latency_series ?? [];
+  if (series.length === 0) return ["start", "", "", "", "now"];
+  const fmt = (iso: string) => {
+    const d = new Date(iso);
+    return window === "24h"
+      ? `${String(d.getHours()).padStart(2, "0")}:00`
+      : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+  return [
+    fmt(series[0].bucket_start),
+    "",
+    fmt(series[Math.floor(series.length / 2)].bucket_start),
+    "",
+    fmt(series[series.length - 1].bucket_start),
+  ];
 }
 
 function tokensCostFromRuns(
@@ -373,11 +390,23 @@ export default async function AgentTab({
             <Card title={`Latency · p50/p95/p99 · ${window}`}>
               <LineChart
                 lines={[
-                  { name: "p50", color: "#E8A87C", values: flat(metrics?.p50_latency_ms ?? null) },
-                  { name: "p95", color: "#6BBAB1", values: flat(metrics?.p95_latency_ms ?? null) },
-                  { name: "p99", color: "#D98A6A", values: flat(metrics?.p99_latency_ms ?? null) },
+                  {
+                    name: "p50",
+                    color: "#E8A87C",
+                    values: (metrics?.latency_series ?? []).map((p) => p.p50_latency_ms),
+                  },
+                  {
+                    name: "p95",
+                    color: "#6BBAB1",
+                    values: (metrics?.latency_series ?? []).map((p) => p.p95_latency_ms),
+                  },
+                  {
+                    name: "p99",
+                    color: "#D98A6A",
+                    values: (metrics?.latency_series ?? []).map((p) => p.p99_latency_ms),
+                  },
                 ]}
-                xLabels={["start", "", "", "", "now"]}
+                xLabels={latencyXLabels(metrics, window)}
                 yTicks={latencyTicks(metrics)}
                 yFormat={(v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${v}ms`)}
               />

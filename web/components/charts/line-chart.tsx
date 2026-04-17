@@ -1,8 +1,32 @@
+import { Fragment } from "react";
+
 export type LineSeries = {
   name: string;
   color: string;
-  values: number[];
+  /** `null` skips that x-position — the line breaks into a new segment on the next non-null value. */
+  values: Array<number | null>;
 };
+
+/**
+ * Split a series of possibly-null values into contiguous non-null runs,
+ * each paired with its x-index so SVG polylines render as broken segments.
+ */
+function segments(values: Array<number | null>): Array<Array<{ x: number; y: number }>> {
+  const out: Array<Array<{ x: number; y: number }>> = [];
+  let current: Array<{ x: number; y: number }> = [];
+  values.forEach((v, i) => {
+    if (v == null) {
+      if (current.length) {
+        out.push(current);
+        current = [];
+      }
+    } else {
+      current.push({ x: i, y: v });
+    }
+  });
+  if (current.length) out.push(current);
+  return out;
+}
 
 export function LineChart({
   lines,
@@ -21,6 +45,9 @@ export function LineChart({
   const vh = 130;
   const maxY = yTicks[yTicks.length - 1] ?? 1;
   const toY = (v: number) => vh - (v / maxY) * vh;
+  // Assume the longest series defines the x-domain. Dotted fallback if empty.
+  const length = Math.max(0, ...lines.map((s) => s.values.length));
+  const step = length > 1 ? vw / (length - 1) : 0;
   return (
     <div className="relative" style={{ height }}>
       <div className="absolute left-0 top-0 bottom-[18px] w-[40px] flex flex-col justify-between font-mono text-[9px] text-patina">
@@ -44,17 +71,37 @@ export function LineChart({
             />
           ))}
           {lines.map((s) => {
-            if (s.values.length === 0) return null;
-            const step = s.values.length > 1 ? vw / (s.values.length - 1) : 0;
-            const points = s.values.map((v, i) => `${i * step},${toY(v).toFixed(2)}`).join(" ");
+            const segs = segments(s.values);
+            if (segs.length === 0) return null;
             return (
-              <polyline
-                key={s.name}
-                points={points}
-                fill="none"
-                stroke={s.color}
-                strokeWidth={1.5}
-              />
+              <Fragment key={s.name}>
+                {segs.map((seg, si) => {
+                  if (seg.length === 1) {
+                    const pt = seg[0];
+                    return (
+                      <circle
+                        key={si}
+                        cx={pt.x * step}
+                        cy={toY(pt.y)}
+                        r={1.5}
+                        fill={s.color}
+                      />
+                    );
+                  }
+                  const points = seg
+                    .map((p) => `${p.x * step},${toY(p.y).toFixed(2)}`)
+                    .join(" ");
+                  return (
+                    <polyline
+                      key={si}
+                      points={points}
+                      fill="none"
+                      stroke={s.color}
+                      strokeWidth={1.5}
+                    />
+                  );
+                })}
+              </Fragment>
             );
           })}
         </svg>

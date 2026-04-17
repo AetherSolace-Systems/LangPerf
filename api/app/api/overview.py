@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
 from app.models import Agent, Span, Trajectory
+from app.otlp.latency_series import latency_series
 from app.schemas import (
     EnvSplit,
     FlaggedRun,
@@ -245,6 +246,8 @@ async def get_overview(
         for row in most_ran_rows
     ]
 
+    latency = await latency_series(session, window=window)
+
     return OverviewResponse(
         window=window,
         kpi=kpi,
@@ -254,4 +257,5 @@ async def get_overview(
         recent_flagged=recent_flagged,
         heatmap=[],  # deprecated — UI no longer renders; kept for backward compat
         most_ran_agents=most_ran_agents,
+        latency_series=latency,
     )
