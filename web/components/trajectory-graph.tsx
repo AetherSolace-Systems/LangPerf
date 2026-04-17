@@ -9,6 +9,7 @@ import {
   BackgroundVariant,
   Controls,
   Handle,
+  MarkerType,
   MiniMap,
   Position,
   ReactFlow,
@@ -19,40 +20,47 @@ import {
 
 import type { Span } from "@/lib/api";
 import { DRIFT, kindSwatch } from "@/lib/colors";
+import { buildEntityGraph, type ActionEdge, type Entity } from "@/lib/entity-graph";
 import { fmtDuration, fmtTokens } from "@/lib/format";
-import { kindOf } from "@/lib/span-fields";
 
 type NodeData = {
-  span: Span;
-  kind: string;
+  entity: Entity;
   selected: boolean;
 };
 
-type TrajectoryNode = Node<NodeData, "trajectory">;
+type EntityNode = Node<NodeData, "entity">;
 
-const NODE_WIDTH = 260;
-const NODE_HEIGHT = 96;
+const NODE_WIDTH = 220;
+const NODE_HEIGHT = 72;
 
-function TrajectoryNodeComp({ data, selected }: NodeProps<TrajectoryNode>) {
-  const { span, kind } = data;
-  const swatch = kindSwatch(kind);
+const kindIcon: Record<Entity["kind"], string> = {
+  trajectory: "◆",
+  agent: "◇",
+  llm: "✦",
+  tool: "▸",
+};
 
-  const tokens =
-    (span.attributes["llm.token_count.total"] as number | undefined) ??
-    (span.attributes["gen_ai.usage.total_tokens"] as number | undefined) ??
-    null;
-  const isError = span.status_code === "ERROR";
+const kindLabel: Record<Entity["kind"], string> = {
+  trajectory: "trajectory",
+  agent: "agent",
+  llm: "llm",
+  tool: "tool",
+};
+
+function EntityNodeComp({ data, selected }: NodeProps<EntityNode>) {
+  const { entity } = data;
+  const swatch = kindSwatch(entity.kind);
   const isActive = selected || data.selected;
 
   return (
     <div
-      className="rounded-md border-2 backdrop-blur-sm px-3 py-2 cursor-pointer transition-colors"
+      className="rounded-full border-2 px-4 py-2 cursor-pointer transition-colors backdrop-blur-sm"
       style={{
         width: NODE_WIDTH,
         minHeight: NODE_HEIGHT,
         borderColor: isActive ? DRIFT.marigold : swatch.border,
         background: swatch.bg,
-        boxShadow: isActive ? `0 0 0 2px ${DRIFT.marigold}33` : "none",
+        boxShadow: isActive ? `0 0 0 2px ${DRIFT.marigold}44` : "none",
       }}
     >
       <Handle
@@ -61,28 +69,27 @@ function TrajectoryNodeComp({ data, selected }: NodeProps<TrajectoryNode>) {
         isConnectable={false}
         style={{ background: DRIFT.twilight, borderColor: DRIFT.twilight, width: 6, height: 6 }}
       />
-      <div
-        className="text-[10px] font-mono uppercase tracking-wider"
-        style={{ color: swatch.fg }}
-      >
-        {kind}
-        {isError ? <span className="ml-2 text-coral">!</span> : null}
-      </div>
-      <div className="mt-0.5 text-sm font-medium text-linen truncate">
-        {span.name}
-      </div>
-      <div className="mt-1 flex items-center gap-3 text-[10px] text-twilight font-mono tabular-nums">
-        {tokens != null ? <span>{fmtTokens(tokens)}t</span> : null}
-        <span>{fmtDuration(span.duration_ms)}</span>
-        {span.notes ? (
-          <span
-            style={{ color: DRIFT.marigold }}
-            title="has notes"
-            aria-label="has notes"
+      <div className="flex items-center gap-2">
+        <span style={{ color: swatch.fg }} className="text-lg leading-none">
+          {kindIcon[entity.kind]}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div
+            className="text-[10px] uppercase tracking-wider"
+            style={{ color: swatch.fg }}
           >
-            ●
-          </span>
-        ) : null}
+            {kindLabel[entity.kind]}
+            {entity.subtitle ? (
+              <span className="text-twilight ml-1">· {entity.subtitle}</span>
+            ) : null}
+          </div>
+          <div
+            className="text-sm font-medium text-linen truncate"
+            title={entity.label}
+          >
+            {entity.label}
+          </div>
+        </div>
       </div>
       <Handle
         type="source"
@@ -94,20 +101,20 @@ function TrajectoryNodeComp({ data, selected }: NodeProps<TrajectoryNode>) {
   );
 }
 
-const nodeTypes = { trajectory: TrajectoryNodeComp };
+const nodeTypes = { entity: EntityNodeComp };
 
 function layout(
-  nodes: TrajectoryNode[],
+  nodes: EntityNode[],
   edges: Edge[],
-): { nodes: TrajectoryNode[]; edges: Edge[] } {
+): { nodes: EntityNode[]; edges: Edge[] } {
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
   g.setGraph({
     rankdir: "TB",
-    nodesep: 30,
-    ranksep: 40,
-    marginx: 12,
-    marginy: 12,
+    nodesep: 44,
+    ranksep: 90,
+    marginx: 20,
+    marginy: 20,
   });
 
   for (const n of nodes) {
@@ -116,22 +123,27 @@ function layout(
   for (const e of edges) {
     g.setEdge(e.source, e.target);
   }
-
   dagre.layout(g);
 
   const positioned = nodes.map((n) => {
     const pos = g.node(n.id);
     return {
       ...n,
-      position: {
-        x: pos.x - NODE_WIDTH / 2,
-        y: pos.y - NODE_HEIGHT / 2,
-      },
+      position: { x: pos.x - NODE_WIDTH / 2, y: pos.y - NODE_HEIGHT / 2 },
     };
   });
-
   return { nodes: positioned, edges };
 }
+
+function edgeLabel(e: ActionEdge): string {
+  const count = e.callCount === 1 ? "1 call" : `${e.callCount} calls`;
+  const parts = [`${e.action} · ${count}`];
+  if (e.totalTokens > 0) parts.push(fmtTokens(e.totalTokens) + "t");
+  if (e.totalDurationMs > 0) parts.push(fmtDuration(e.totalDurationMs));
+  return parts.join(" · ");
+}
+
+type EdgePayload = { actionEdge: ActionEdge };
 
 export function TrajectoryGraph({
   spans,
@@ -142,50 +154,115 @@ export function TrajectoryGraph({
   selectedId: string | null;
   onSelect: (span: Span) => void;
 }) {
-  const { nodes, edges } = useMemo(() => {
-    const spanById = new Map(spans.map((s) => [s.span_id, s]));
-    const rawNodes: TrajectoryNode[] = spans.map((s) => ({
-      id: s.span_id,
-      type: "trajectory",
+  const { entities, edges } = useMemo(
+    () => buildEntityGraph(spans),
+    [spans],
+  );
+
+  const { nodes, rfEdges, edgePayload } = useMemo(() => {
+    const selectedSpan = selectedId
+      ? spans.find((s) => s.span_id === selectedId) ?? null
+      : null;
+
+    const nodesRaw: EntityNode[] = entities.map((e) => ({
+      id: e.id,
+      type: "entity",
       position: { x: 0, y: 0 },
       data: {
-        span: s,
-        kind: kindOf(s),
-        selected: s.span_id === selectedId,
+        entity: e,
+        selected: selectedSpan
+          ? e.spans.some((s) => s.span_id === selectedSpan.span_id)
+          : false,
       },
     }));
-    const rawEdges: Edge[] = spans
-      .filter((s) => s.parent_span_id && spanById.has(s.parent_span_id))
-      .map((s) => ({
-        id: `${s.parent_span_id}->${s.span_id}`,
-        source: s.parent_span_id!,
-        target: s.span_id,
-        type: "smoothstep",
-        animated: false,
-        style: { stroke: DRIFT.twilight, strokeOpacity: 0.6, strokeWidth: 1.25 },
-      }));
-    return layout(rawNodes, rawEdges);
-  }, [spans, selectedId]);
 
-  if (spans.length === 0) {
-    return <div className="p-6 text-sm text-twilight">No spans to graph.</div>;
+    const rfEdgesRaw: Edge[] = edges.map((e) => {
+      const isActive = selectedSpan
+        ? e.spans.some((s) => s.span_id === selectedSpan.span_id)
+        : false;
+      const swatchHex =
+        e.action === "chat"
+          ? DRIFT.driftViolet
+          : e.action === "invoke"
+            ? DRIFT.marigold
+            : DRIFT.lagoon;
+      return {
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        label: edgeLabel(e),
+        labelStyle: {
+          fill: DRIFT.linen,
+          fontSize: 10,
+          fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+        },
+        labelBgStyle: {
+          fill: DRIFT.deepIndigo,
+          fillOpacity: 0.92,
+        },
+        labelBgPadding: [6, 3],
+        labelBgBorderRadius: 4,
+        type: "smoothstep",
+        animated: isActive,
+        style: {
+          stroke: isActive ? DRIFT.marigold : swatchHex,
+          strokeWidth: isActive ? 2 : 1.4,
+          strokeOpacity: isActive ? 1 : 0.7,
+        },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          width: 18,
+          height: 18,
+          color: isActive ? DRIFT.marigold : swatchHex,
+        },
+      };
+    });
+
+    const laidOut = layout(nodesRaw, rfEdgesRaw);
+    const payloadMap: Record<string, EdgePayload> = {};
+    for (const e of edges) payloadMap[e.id] = { actionEdge: e };
+    return {
+      nodes: laidOut.nodes,
+      rfEdges: laidOut.edges,
+      edgePayload: payloadMap,
+    };
+  }, [entities, edges, selectedId, spans]);
+
+  if (entities.length === 0) {
+    return <div className="p-6 text-sm text-twilight">No entities to graph.</div>;
   }
+
+  const handleNodeClick = (entity: Entity) => {
+    if (entity.spans.length > 0) {
+      onSelect(entity.spans[0]);
+    }
+  };
+
+  const handleEdgeClick = (edgeId: string) => {
+    const payload = edgePayload[edgeId];
+    if (!payload) return;
+    const spans = payload.actionEdge.spans;
+    if (spans.length === 0) return;
+    // Cycle through spans if the selected one is already in this edge,
+    // else pick the first.
+    const currentIdx = spans.findIndex((s) => s.span_id === selectedId);
+    const next = spans[(currentIdx + 1) % spans.length];
+    onSelect(next);
+  };
 
   return (
     <div className="w-full h-full bg-midnight">
       <ReactFlow
         nodes={nodes}
-        edges={edges}
+        edges={rfEdges}
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ padding: 0.15 }}
         minZoom={0.2}
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
-        onNodeClick={(_, n) => {
-          const span = (n.data as NodeData).span;
-          onSelect(span);
-        }}
+        onNodeClick={(_, n) => handleNodeClick((n.data as NodeData).entity)}
+        onEdgeClick={(_, e) => handleEdgeClick(e.id)}
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={true}
@@ -205,7 +282,9 @@ export function TrajectoryGraph({
         <MiniMap
           className="!bg-deep-indigo !border !border-[color:var(--border)]"
           maskColor="rgba(20,20,31,0.6)"
-          nodeColor={(n) => kindSwatch((n.data as NodeData).kind).solid}
+          nodeColor={(n) =>
+            kindSwatch((n.data as NodeData).entity.kind).solid
+          }
           nodeStrokeWidth={0}
         />
       </ReactFlow>
