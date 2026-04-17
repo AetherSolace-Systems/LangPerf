@@ -44,7 +44,7 @@ function TreeRow({ node }: { node: TreeNode }) {
           }
         }}
         className={`group flex items-center gap-2 px-3 py-1.5 border-b border-[color:var(--border)]/50 cursor-pointer hover:bg-linen/[0.04] transition-colors ${
-          isSelected ? "bg-drift-violet/10 border-l-2 border-l-drift-violet" : ""
+          isSelected ? "bg-aether-teal/10 border-l-2 border-l-aether-teal" : ""
         }`}
         style={{ paddingLeft: `${node.depth * 16 + 12}px` }}
       >

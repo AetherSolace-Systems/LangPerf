@@ -220,7 +220,7 @@ export function TrajectoryGraph({ spans }: { spans: Span[] }) {
         />
         <Controls
           showInteractive={false}
-          className="!bg-deep-indigo !border !border-[color:var(--border)] !shadow-none [&_button]:!bg-deep-indigo [&_button]:!border-[color:var(--border)] [&_button]:!text-linen [&_button]:!fill-linen [&_button:hover]:!bg-drift-violet/20"
+          className="!bg-deep-indigo !border !border-[color:var(--border)] !shadow-none [&_button]:!bg-deep-indigo [&_button]:!border-[color:var(--border)] [&_button]:!text-linen [&_button]:!fill-linen [&_button:hover]:!bg-aether-teal/20"
         />
       </ReactFlow>
     </div>

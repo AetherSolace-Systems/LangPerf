@@ -162,7 +162,7 @@ function ToggleButton({
       onClick={onClick}
       className={`px-2 py-0.5 rounded border text-[10px] uppercase tracking-wider transition-colors ${
         active
-          ? "border-drift-violet text-drift-violet bg-drift-violet/10"
+          ? "border-aether-teal text-aether-teal bg-aether-teal/10"
           : "border-[color:var(--border)] text-twilight hover:text-linen hover:border-twilight"
       }`}
     >
