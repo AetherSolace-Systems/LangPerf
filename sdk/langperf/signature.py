@@ -60,9 +60,17 @@ def detect(caller_stack_offset: int = 2) -> AgentIdentity:
         if rel is not None:
             signature = f"git:{origin}:{rel}"
         else:
-            signature = f"mod:{socket.gethostname()}:{caller_module}"
+            signature = _module_signature(caller_path, caller_module)
+    elif repo_root:
+        # Git working tree but no origin — use repo root + relative path so
+        # two scripts in the same repo still get distinct signatures.
+        try:
+            rel = str(caller_path.resolve().relative_to(repo_root))
+            signature = f"repo:{repo_root}:{rel}"
+        except ValueError:
+            signature = _module_signature(caller_path, caller_module)
     else:
-        signature = f"mod:{socket.gethostname()}:{caller_module}"
+        signature = _module_signature(caller_path, caller_module)
 
     git_sha, short_sha = _git_head(repo_root) if repo_root else (None, None)
     pkg = _package_version_for(caller_module)
@@ -74,6 +82,20 @@ def detect(caller_stack_offset: int = 2) -> AgentIdentity:
         short_sha=short_sha,
         package_version=pkg,
     )
+
+
+def _module_signature(caller_path: Path, caller_module: str) -> str:
+    """Fallback signature when no git info is available.
+
+    Uses the full file path — the module name is useless for scripts invoked
+    directly (they all report `__main__`), whereas the file path distinguishes
+    `examples/weather_bot.py` from `examples/code_helper.py`.
+    """
+    host = socket.gethostname()
+    path = str(caller_path.resolve())
+    if caller_module and caller_module != "__main__":
+        return f"mod:{host}:{caller_module}:{path}"
+    return f"mod:{host}:{path}"
 
 
 def _caller_info(stack_offset: int) -> tuple[Path, str]:
