@@ -18,7 +18,7 @@
 import type { Span } from "@/lib/api";
 import { kindOf } from "@/lib/span-fields";
 
-export type EntityKind = "trajectory" | "agent" | "llm" | "tool";
+export type EntityKind = "trajectory" | "agent" | "llm" | "tool" | "reasoning";
 
 export type Entity = {
   id: string;
@@ -32,7 +32,7 @@ export type ActionEdge = {
   id: string;
   source: string;
   target: string;
-  action: "dispatch" | "chat" | "invoke";
+  action: "dispatch" | "chat" | "invoke" | "think";
   spans: Span[]; // all spans collapsed into this edge, ordered by started_at
   callCount: number;
   totalTokens: number;
@@ -74,11 +74,11 @@ export function buildEntityGraph(
     // Skip the trajectory root — it IS the entity, not a call.
     if (span === trajectorySpan) continue;
 
-    const target = resolveTarget(span, kind);
-    if (!target) continue; // reasoning/generic spans: no edge (parent agent owns them)
-
     // Find the actor: nearest ancestor agent, or the root.
     const actor = resolveActor(span, byId, rootEntity);
+
+    const target = resolveTarget(span, kind, actor);
+    if (!target) continue; // generic spans: no edge (parent agent owns them)
 
     upsertEntity(entities, actor);
     upsertEntity(entities, target);
@@ -160,7 +160,7 @@ function resolveActor(
   return root;
 }
 
-function resolveTarget(span: Span, kind: string): Entity | null {
+function resolveTarget(span: Span, kind: string, actor: Entity): Entity | null {
   if (kind === "llm") {
     const model = (span.attributes["llm.model_name"] as string) ??
       (span.attributes["gen_ai.request.model"] as string) ??
@@ -197,6 +197,18 @@ function resolveTarget(span: Span, kind: string): Entity | null {
       spans: [span],
     };
   }
+  if (kind === "reasoning") {
+    // One reasoning entity per actor — "the thinking this actor did" — so
+    // multiple reasoning spans from the same actor collapse into one node
+    // with a high call count, and multiple actors each get their own.
+    return {
+      id: `reasoning:${actor.id}`,
+      kind: "reasoning",
+      label: "reasoning",
+      subtitle: actor.kind === "trajectory" ? undefined : `in ${actor.label}`,
+      spans: [],
+    };
+  }
   return null;
 }
 
@@ -204,6 +216,7 @@ function actionFor(kind: EntityKind): ActionEdge["action"] {
   if (kind === "agent") return "dispatch";
   if (kind === "llm") return "chat";
   if (kind === "tool") return "invoke";
+  if (kind === "reasoning") return "think";
   return "dispatch";
 }
 

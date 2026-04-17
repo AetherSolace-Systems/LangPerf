@@ -38,6 +38,7 @@ const kindIcon: Record<Entity["kind"], string> = {
   agent: "◇",
   llm: "✦",
   tool: "▸",
+  reasoning: "≈",
 };
 
 const kindLabel: Record<Entity["kind"], string> = {
@@ -45,6 +46,7 @@ const kindLabel: Record<Entity["kind"], string> = {
   agent: "agent",
   llm: "llm",
   tool: "tool",
+  reasoning: "reasoning",
 };
 
 function EntityNodeComp({ data, selected }: NodeProps<EntityNode>) {
@@ -185,7 +187,9 @@ export function TrajectoryGraph({
           ? DRIFT.driftViolet
           : e.action === "invoke"
             ? DRIFT.marigold
-            : DRIFT.lagoon;
+            : e.action === "think"
+              ? DRIFT.plum
+              : DRIFT.lagoon;
       return {
         id: e.id,
         source: e.source,
