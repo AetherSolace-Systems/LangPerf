@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { TrajectoryDetail } from "@/lib/api";
-import { fmtDuration, fmtTime } from "@/lib/format";
+import { fmtDuration } from "@/lib/format";
+import { ClientTime } from "@/components/client-time";
 import { NodeDetailPanel } from "@/components/node-detail-panel";
 import { NotesEditor } from "@/components/notes-editor";
 import { TagSelector } from "@/components/tag-selector";
@@ -62,7 +63,7 @@ export function TrajectoryView({ trajectory }: { trajectory: TrajectoryDetail })
           </span>
           <span className="text-xs text-[var(--muted)]">·</span>
           <span className="text-xs text-[var(--muted)]">
-            {fmtTime(trajectory.started_at)}
+            <ClientTime iso={trajectory.started_at} />
           </span>
         </div>
 

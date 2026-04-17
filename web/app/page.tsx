@@ -4,6 +4,7 @@ import {
   listTrajectories,
   type TrajectorySummary,
 } from "@/lib/api";
+import { ClientTime } from "@/components/client-time";
 import { FilterBar } from "@/components/filter-bar";
 
 export const dynamic = "force-dynamic";
@@ -12,10 +13,6 @@ function fmtDuration(ms: number | null): string {
   if (ms == null) return "—";
   if (ms < 1000) return `${ms}ms`;
   return `${(ms / 1000).toFixed(2)}s`;
-}
-
-function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleString();
 }
 
 function tagStyle(tag: string | null): string {
@@ -67,7 +64,7 @@ function Row({ t }: { t: TrajectorySummary }) {
           {fmtDuration(t.duration_ms)}
         </span>
         <span className="text-xs text-[var(--muted)] w-36 text-right">
-          {fmtTime(t.started_at)}
+          <ClientTime iso={t.started_at} />
         </span>
       </div>
     </Link>
