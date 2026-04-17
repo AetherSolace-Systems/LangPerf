@@ -7,14 +7,9 @@ import {
 import { ClientTime } from "@/components/client-time";
 import { FilterBar } from "@/components/filter-bar";
 import { tagSwatch } from "@/lib/colors";
+import { fmtDuration } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
-
-function fmtDuration(ms: number | null): string {
-  if (ms == null) return "—";
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(2)}s`;
-}
 
 function Row({ t }: { t: TrajectorySummary }) {
   const swatch = tagSwatch(t.status_tag);

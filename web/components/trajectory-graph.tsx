@@ -13,9 +13,10 @@ import {
 } from "@xyflow/react";
 
 import type { Span } from "@/lib/api";
-import { DRIFT, kindSwatch } from "@/lib/colors";
+import { DRIFT, KIND_GLYPH, KIND_LABEL, kindSwatch } from "@/lib/colors";
 import { fmtDuration, fmtTokens } from "@/lib/format";
 import { buildSequenceLayout, type LayoutNode } from "@/lib/sequence-layout";
+import { extractTotalTokens } from "@/lib/span-fields";
 
 type StepData = { layout: LayoutNode; selected: boolean };
 type FrameData = { layout: LayoutNode; selected: boolean };
@@ -23,23 +24,11 @@ type FrameData = { layout: LayoutNode; selected: boolean };
 type StepNode = Node<StepData, "step">;
 type FrameNode = Node<FrameData, "frame">;
 
-const kindGlyph: Record<string, string> = {
-  llm: "✦",
-  tool: "▸",
-  tool_call: "▸",
-  reasoning: "≈",
-  agent: "◇",
-  trajectory: "◆",
-};
-
 function StepNodeComp({ data }: NodeProps<StepNode>) {
   const { layout, selected } = data;
   const { span, nodeKind, execOrder } = layout;
   const swatch = kindSwatch(nodeKind);
-  const tokens =
-    (span?.attributes["llm.token_count.total"] as number | undefined) ??
-    (span?.attributes["gen_ai.usage.total_tokens"] as number | undefined) ??
-    null;
+  const tokens = extractTotalTokens(span);
   const isError = span?.status_code === "ERROR";
 
   // LLM calls are pills; everything else is a rounded rect.
@@ -71,8 +60,8 @@ function StepNodeComp({ data }: NodeProps<StepNode>) {
             className="text-[9px] uppercase tracking-wider font-mono flex items-center gap-1"
             style={{ color: swatch.fg }}
           >
-            <span>{kindGlyph[nodeKind] ?? "•"}</span>
-            <span>{nodeKind}</span>
+            <span>{KIND_GLYPH[nodeKind] ?? "•"}</span>
+            <span>{KIND_LABEL[nodeKind] ?? nodeKind}</span>
           </div>
           <div className="text-[12px] font-medium text-linen truncate mt-0.5">
             {layout.label}
@@ -94,9 +83,7 @@ function FrameNodeComp({ data }: NodeProps<FrameNode>) {
   const { layout, selected } = data;
   const { frameKind, label, span, nodeKind } = layout;
 
-  const tokens =
-    (span?.attributes["llm.token_count.total"] as number | undefined) ??
-    null;
+  const tokens = extractTotalTokens(span);
   const duration = span?.duration_ms ?? null;
 
   if (frameKind === "parallel") {
@@ -146,13 +133,13 @@ function FrameNodeComp({ data }: NodeProps<FrameNode>) {
         }}
       >
         <span style={{ color: swatch.fg }} className="text-sm leading-none">
-          {kindGlyph[nodeKind] ?? "◆"}
+          {KIND_GLYPH[nodeKind] ?? "◆"}
         </span>
         <span
           className="text-[9px] uppercase tracking-wider font-mono"
           style={{ color: swatch.fg }}
         >
-          {nodeKind}
+          {KIND_LABEL[nodeKind] ?? nodeKind}
         </span>
         <span className="text-sm font-medium text-linen truncate">{label}</span>
         <div className="ml-auto flex items-center gap-3 text-[10px] font-mono tabular-nums text-twilight">

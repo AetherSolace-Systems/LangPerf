@@ -62,6 +62,21 @@ export function kindOf(span: Span): string {
   return "generic";
 }
 
+/**
+ * Total tokens for a span, checking both OpenInference (`llm.token_count.total`)
+ * and OTel GenAI (`gen_ai.usage.total_tokens`) conventions. Returns null when
+ * neither is present (e.g. non-LLM span, or local model that didn't report
+ * usage). Prefer this over re-implementing the fallback chain per caller.
+ */
+export function extractTotalTokens(span: Span | null | undefined): number | null {
+  if (!span) return null;
+  const attrs = span.attributes;
+  const t =
+    (attrs["llm.token_count.total"] as number | undefined) ??
+    (attrs["gen_ai.usage.total_tokens"] as number | undefined);
+  return typeof t === "number" ? t : null;
+}
+
 export function extractLlmFields(attrs: Attrs): LlmSpanFields {
   const system =
     (attrs["llm.system"] as string) ??

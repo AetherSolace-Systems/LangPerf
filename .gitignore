@@ -34,3 +34,6 @@ postgres_data/
 
 # LangPerf
 /tmp/
+
+# gen_agent lives here but has its own git repo; not a submodule.
+gen_agent/

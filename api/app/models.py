@@ -32,7 +32,7 @@ class Trajectory(Base):
     id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
     trace_id: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
     service_name: Mapped[str] = mapped_column(String, nullable=False, index=True)
-    environment: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    environment: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
     name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, index=True
@@ -71,7 +71,7 @@ class Span(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     kind: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     started_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
+        DateTime(timezone=True), nullable=False, index=True
     )
     ended_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True

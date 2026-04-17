@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { Span } from "@/lib/api";
 import { kindSwatch } from "@/lib/colors";
 import { fmtDuration, fmtTokens } from "@/lib/format";
-import { kindOf } from "@/lib/span-fields";
+import { extractTotalTokens, kindOf } from "@/lib/span-fields";
 import { buildTree, type TreeNode } from "@/lib/tree";
 
 export function TrajectoryTree({
@@ -50,10 +50,7 @@ function TreeRow({
   const swatch = kindSwatch(kind);
   const isSelected = node.span.span_id === selectedId;
 
-  const totalTokens =
-    (node.span.attributes["llm.token_count.total"] as number | undefined) ??
-    (node.span.attributes["gen_ai.usage.total_tokens"] as number | undefined) ??
-    null;
+  const totalTokens = extractTotalTokens(node.span);
 
   return (
     <div>

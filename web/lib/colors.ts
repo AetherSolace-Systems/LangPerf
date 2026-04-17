@@ -88,3 +88,33 @@ export function tagSwatch(tag: string | null): Swatch {
 
 export const GRADIENT =
   "linear-gradient(135deg, #14141F 0%, #1F2035 30%, #8B8CC7 60%, #E5B754 100%)";
+
+/**
+ * Glyph + label per kind, co-located with the color swatches above. When
+ * a view needs to render a kind (tree row, graph node, timeline label),
+ * reach for KIND_GLYPH / KIND_LABEL together with kindSwatch() so color,
+ * icon, and label stay in sync across views.
+ */
+export const KIND_GLYPH: Record<string, string> = {
+  llm: "✦",
+  tool: "▸",
+  tool_call: "▸",
+  reasoning: "≈",
+  agent: "◇",
+  trajectory: "◆",
+  chain: "▸",
+  retriever: "▸",
+  embedding: "▸",
+};
+
+export const KIND_LABEL: Record<string, string> = {
+  llm: "llm",
+  tool: "tool",
+  tool_call: "tool",
+  reasoning: "reasoning",
+  agent: "agent",
+  trajectory: "trajectory",
+  chain: "chain",
+  retriever: "retriever",
+  embedding: "embedding",
+};

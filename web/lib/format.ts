@@ -11,22 +11,6 @@ export function fmtTokens(n: number | null | undefined): string {
   return `${n}`;
 }
 
-export function fmtTime(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString();
-}
-
-export function fmtRelativeTime(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const d = new Date(iso).getTime();
-  const now = Date.now();
-  const diff = Math.round((now - d) / 1000);
-  if (diff < 60) return `${diff}s ago`;
-  if (diff < 3600) return `${Math.round(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.round(diff / 3600)}h ago`;
-  return `${Math.round(diff / 86400)}d ago`;
-}
-
 export function safeJsonParse(value: unknown): unknown {
   if (typeof value !== "string") return value;
   try {
