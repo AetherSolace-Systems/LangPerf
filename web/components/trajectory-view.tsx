@@ -7,6 +7,7 @@ import { fmtDuration, fmtTime } from "@/lib/format";
 import { NodeDetailPanel } from "@/components/node-detail-panel";
 import { NotesEditor } from "@/components/notes-editor";
 import { TagSelector } from "@/components/tag-selector";
+import { TrajectoryGraph } from "@/components/trajectory-graph";
 import { TrajectoryTree } from "@/components/trajectory-tree";
 
 export function TrajectoryView({ trajectory }: { trajectory: TrajectoryDetail }) {
@@ -21,6 +22,8 @@ export function TrajectoryView({ trajectory }: { trajectory: TrajectoryDetail })
         : null,
     [selectedId, trajectory.spans],
   );
+
+  const handleSelect = (span: { span_id: string }) => setSelectedId(span.span_id);
 
   return (
     <div className="h-screen flex flex-col">
@@ -89,12 +92,29 @@ export function TrajectoryView({ trajectory }: { trajectory: TrajectoryDetail })
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        <div className="flex-1 min-w-0 overflow-y-auto border-r border-[var(--border)]">
-          <TrajectoryTree
-            spans={trajectory.spans}
-            selectedId={selectedId}
-            onSelect={(s) => setSelectedId(s.span_id)}
-          />
+        <div className="flex-1 min-w-0 flex flex-col border-r border-[var(--border)]">
+          <div className="flex-shrink-0 overflow-y-auto max-h-[40%] border-b border-[var(--border)]">
+            <div className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-[var(--muted)] bg-black/20 sticky top-0 border-b border-[var(--border)]">
+              Tree
+            </div>
+            <TrajectoryTree
+              spans={trajectory.spans}
+              selectedId={selectedId}
+              onSelect={handleSelect}
+            />
+          </div>
+          <div className="flex-1 min-h-0 flex flex-col">
+            <div className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-[var(--muted)] bg-black/20 flex-shrink-0 border-b border-[var(--border)]">
+              Graph
+            </div>
+            <div className="flex-1 min-h-0">
+              <TrajectoryGraph
+                spans={trajectory.spans}
+                selectedId={selectedId}
+                onSelect={handleSelect}
+              />
+            </div>
+          </div>
         </div>
         <div className="w-[480px] flex-shrink-0 overflow-hidden">
           <NodeDetailPanel span={selectedSpan} />

@@ -10,6 +10,7 @@ so we can pull items up into a specific future version as the product evolves.
 - OTLP/HTTP ingestion at `/v1/traces` (JSON + protobuf)
 - Python `langperf` SDK: `init`, `trajectory`, `node`, `flush`
 - Trajectory list + detail with collapsible tree viewer
+- Graph view (React Flow + dagre auto-layout) with pan / zoom / minimap — selection synced with the tree
 - Kind-aware right panel (LLM / tool / generic)
 - Manual tagging (`good` / `bad` / `interesting` / `todo`) + free-form notes on trajectories and nodes
 - Filter by tag / service / environment, free-text search across span content
@@ -45,8 +46,8 @@ so we can pull items up into a specific future version as the product evolves.
 - Inter-annotator agreement + rubrics
 
 ### Developer loop
-- Full DAG viewer with zoom, pan, branch collapse
 - Side-by-side diff of two trajectories
+- Graph viewer upgrades (perf tuning for 1k+ node trajectories, node grouping, custom layouts, branch collapse in graph — tree already supports collapse)
 - Replay-against-new-prompt in dev ("would v2 have gotten this right?")
 - Eval sets derived from flagged clusters
 - Regression CI (run flagged clusters against every prompt change)

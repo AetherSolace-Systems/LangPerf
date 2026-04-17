@@ -88,12 +88,10 @@ Four public symbols.
 
 ## UI features (v1)
 
-- Collapsible trajectory tree; click any row for kind-aware detail
-- LLM view: roles, messages, tool calls, token counts, invocation params, raw response
-- Tool view: args + result
-- Generic JSON view for everything else
+- Split left pane: collapsible **tree** on top, auto-laid-out **graph** (React Flow + dagre) below, with selection synced between them and the right panel
+- Kind-aware right panel — LLM view (roles, messages, tool calls, tokens, invocation params, raw response), tool view (args + result), generic JSON view
 - Tag trajectories as `good` / `bad` / `interesting` / `todo`
-- Free-form markdown notes on trajectories and on individual nodes
+- Free-form markdown notes on trajectories and on individual nodes (saved on blur)
 - Filter by tag, service, environment; full-text search across span content
 
 ## Directory layout
