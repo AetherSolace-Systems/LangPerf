@@ -56,3 +56,21 @@ class TrajectoryListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class TrajectoryPatch(BaseModel):
+    status_tag: Optional[str] = None
+    notes: Optional[str] = None
+    clear_tag: bool = False
+    clear_notes: bool = False
+
+
+class NodePatch(BaseModel):
+    notes: Optional[str] = None
+    clear_notes: bool = False
+
+
+class FacetsResponse(BaseModel):
+    services: list[str]
+    environments: list[str]
+    tags: list[str]

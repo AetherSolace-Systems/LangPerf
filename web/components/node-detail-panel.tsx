@@ -4,6 +4,7 @@ import type { Span } from "@/lib/api";
 import { kindOf } from "@/lib/span-fields";
 import { GenericSpanView } from "@/components/views/generic-span-view";
 import { LlmSpanView } from "@/components/views/llm-span-view";
+import { NotesEditor } from "@/components/notes-editor";
 import { ToolSpanView } from "@/components/views/tool-span-view";
 
 export function NodeDetailPanel({ span }: { span: Span | null }) {
@@ -28,7 +29,18 @@ export function NodeDetailPanel({ span }: { span: Span | null }) {
           {span.span_id}
         </div>
       </header>
-      <div className="p-5">
+      <div className="p-5 space-y-5">
+        <section>
+          <h3 className="text-[10px] uppercase tracking-wider text-[var(--muted)] mb-2">
+            Notes
+          </h3>
+          <NotesEditor
+            target={{ kind: "node", id: span.span_id }}
+            value={span.notes}
+            placeholder="Notes on this node…"
+            compact
+          />
+        </section>
         {kind === "llm" ? (
           <LlmSpanView span={span} />
         ) : kind === "tool" ? (

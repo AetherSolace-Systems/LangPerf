@@ -5,11 +5,14 @@ import Link from "next/link";
 import type { TrajectoryDetail } from "@/lib/api";
 import { fmtDuration, fmtTime } from "@/lib/format";
 import { NodeDetailPanel } from "@/components/node-detail-panel";
+import { NotesEditor } from "@/components/notes-editor";
+import { TagSelector } from "@/components/tag-selector";
 import { TrajectoryTree } from "@/components/trajectory-tree";
 
 export function TrajectoryView({ trajectory }: { trajectory: TrajectoryDetail }) {
   const firstSpanId = trajectory.spans[0]?.span_id ?? null;
   const [selectedId, setSelectedId] = useState<string | null>(firstSpanId);
+  const [notesOpen, setNotesOpen] = useState<boolean>(!!trajectory.notes);
 
   const selectedSpan = useMemo(
     () =>
@@ -59,6 +62,30 @@ export function TrajectoryView({ trajectory }: { trajectory: TrajectoryDetail })
             {fmtTime(trajectory.started_at)}
           </span>
         </div>
+
+        <div className="mt-3 flex items-center gap-3 flex-wrap">
+          <TagSelector
+            trajectoryId={trajectory.id}
+            value={trajectory.status_tag}
+          />
+          <button
+            type="button"
+            onClick={() => setNotesOpen((v) => !v)}
+            className="text-[10px] uppercase tracking-wider text-[var(--muted)] hover:text-[var(--foreground)] border border-[var(--border)] rounded px-2 py-0.5"
+          >
+            {notesOpen ? "hide notes" : trajectory.notes ? "notes" : "+ notes"}
+          </button>
+        </div>
+
+        {notesOpen ? (
+          <div className="mt-3 max-w-2xl">
+            <NotesEditor
+              target={{ kind: "trajectory", id: trajectory.id }}
+              value={trajectory.notes}
+              placeholder="Notes on this trajectory (markdown allowed)…"
+            />
+          </div>
+        ) : null}
       </header>
 
       <div className="flex flex-1 overflow-hidden">

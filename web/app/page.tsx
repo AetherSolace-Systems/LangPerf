@@ -1,5 +1,10 @@
 import Link from "next/link";
-import { listTrajectories, type TrajectorySummary } from "@/lib/api";
+import {
+  getFacets,
+  listTrajectories,
+  type TrajectorySummary,
+} from "@/lib/api";
+import { FilterBar } from "@/components/filter-bar";
 
 export const dynamic = "force-dynamic";
 
@@ -69,10 +74,26 @@ function Row({ t }: { t: TrajectorySummary }) {
   );
 }
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
+  const params = await searchParams;
+
   let data;
+  let facets;
   try {
-    data = await listTrajectories({ limit: 100 });
+    [data, facets] = await Promise.all([
+      listTrajectories({
+        limit: 100,
+        tag: params.tag,
+        service: params.service,
+        environment: params.environment,
+        q: params.q,
+      }),
+      getFacets(),
+    ]);
   } catch (err) {
     return (
       <main className="min-h-screen p-10">
@@ -89,26 +110,40 @@ export default async function Home() {
     );
   }
 
+  const hasFilters = Object.values(params).some(Boolean);
+
   return (
     <main className="min-h-screen">
       <header className="border-b border-[var(--border)] px-6 py-4 flex items-baseline gap-3">
         <h1 className="text-lg font-semibold tracking-tight">LangPerf</h1>
         <span className="text-xs text-[var(--muted)]">
           {data.total} trajector{data.total === 1 ? "y" : "ies"}
+          {hasFilters ? " (filtered)" : ""}
         </span>
       </header>
 
+      <FilterBar facets={facets} />
+
       {data.items.length === 0 ? (
         <div className="p-10 text-sm text-[var(--muted)]">
-          <p>No trajectories yet.</p>
-          <p className="mt-2">
-            Send OTLP spans to{" "}
-            <code className="font-mono text-[var(--accent)]">
-              POST http://localhost:4318/v1/traces
-            </code>{" "}
-            — or run <code className="font-mono">python scripts/smoke.py</code>
-            .
-          </p>
+          {hasFilters ? (
+            <p>No trajectories match these filters.</p>
+          ) : (
+            <>
+              <p>No trajectories yet.</p>
+              <p className="mt-2">
+                Send OTLP spans to{" "}
+                <code className="font-mono text-[var(--accent)]">
+                  POST http://localhost:4318/v1/traces
+                </code>{" "}
+                — or run{" "}
+                <code className="font-mono">
+                  python examples/lm_studio_agent.py
+                </code>
+                .
+              </p>
+            </>
+          )}
         </div>
       ) : (
         <div>

@@ -4,6 +4,9 @@
 const SERVER_API_URL =
   process.env.LANGPERF_API_URL ?? "http://localhost:4318";
 
+export const CLIENT_API_URL =
+  process.env.NEXT_PUBLIC_LANGPERF_API_URL ?? "http://localhost:4318";
+
 export type TrajectorySummary = {
   id: string;
   trace_id: string | null;
@@ -46,23 +49,57 @@ export type TrajectoryListResponse = {
   offset: number;
 };
 
+export type FacetsResponse = {
+  services: string[];
+  environments: string[];
+  tags: string[];
+};
+
+export type ListFilters = {
+  limit?: number;
+  offset?: number;
+  tag?: string;
+  service?: string;
+  environment?: string;
+  q?: string;
+};
+
+function buildQuery(filters: ListFilters): string {
+  const p = new URLSearchParams();
+  if (filters.limit != null) p.set("limit", String(filters.limit));
+  if (filters.offset != null) p.set("offset", String(filters.offset));
+  if (filters.tag) p.set("tag", filters.tag);
+  if (filters.service) p.set("service", filters.service);
+  if (filters.environment) p.set("environment", filters.environment);
+  if (filters.q) p.set("q", filters.q);
+  const s = p.toString();
+  return s ? `?${s}` : "";
+}
+
 async function apiFetch<T>(path: string): Promise<T> {
   const url = `${SERVER_API_URL}${path}`;
   const resp = await fetch(url, { cache: "no-store" });
-  if (!resp.ok) {
-    throw new Error(`langperf-api ${resp.status} at ${url}`);
-  }
+  if (!resp.ok) throw new Error(`langperf-api ${resp.status} at ${url}`);
   return resp.json();
 }
 
 export async function listTrajectories(
-  { limit = 50, offset = 0 }: { limit?: number; offset?: number } = {},
+  filters: ListFilters = {},
 ): Promise<TrajectoryListResponse> {
+  const base = {
+    limit: filters.limit ?? 100,
+    offset: filters.offset ?? 0,
+    ...filters,
+  };
   return apiFetch<TrajectoryListResponse>(
-    `/api/trajectories?limit=${limit}&offset=${offset}`,
+    `/api/trajectories${buildQuery(base)}`,
   );
 }
 
 export async function getTrajectory(id: string): Promise<TrajectoryDetail> {
   return apiFetch<TrajectoryDetail>(`/api/trajectories/${id}`);
+}
+
+export async function getFacets(): Promise<FacetsResponse> {
+  return apiFetch<FacetsResponse>(`/api/trajectories/facets`);
 }
