@@ -25,7 +25,7 @@ export function FilterBar({ facets }: { facets: FacetsResponse }) {
       if (v === null || v === "") next.delete(k);
       else next.set(k, v);
     }
-    startTransition(() => router.push(`/?${next.toString()}`));
+    startTransition(() => router.push(`/history?${next.toString()}`));
   };
 
   const selectCls =
@@ -87,7 +87,7 @@ export function FilterBar({ facets }: { facets: FacetsResponse }) {
           type="button"
           onClick={() => {
             setQ("");
-            startTransition(() => router.push("/"));
+            startTransition(() => router.push("/history"));
           }}
           className="text-xs font-mono text-[var(--muted)] hover:text-[var(--foreground)] px-2"
         >
