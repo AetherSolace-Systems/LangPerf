@@ -1,8 +1,7 @@
-"""ORM models: Trajectory and Span.
+"""ORM models: Trajectory, Span, Agent, AgentVersion.
 
-Mirrors the data model section of the v1 plan. Large payloads land in JSONB
-attributes column on spans — Postgres TOASTs values >2KB automatically so
-trajectories with long context windows compress in place.
+Large payloads land in JSONB `attributes` on spans — Postgres TOASTs values
+>2KB automatically so trajectories with long context windows compress in place.
 """
 
 from __future__ import annotations
@@ -16,6 +15,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -24,6 +24,67 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 class Base(DeclarativeBase):
     pass
+
+
+class Agent(Base):
+    __tablename__ = "agents"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    signature: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
+    display_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    owner: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    github_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    language: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    versions: Mapped[list["AgentVersion"]] = relationship(
+        back_populates="agent",
+        cascade="all, delete-orphan",
+        order_by="AgentVersion.first_seen_at.desc()",
+    )
+
+
+class AgentVersion(Base):
+    __tablename__ = "agent_versions"
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    agent_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("agents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    git_sha: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    short_sha: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    package_version: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    label: Mapped[str] = mapped_column(String, nullable=False)
+    first_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    agent: Mapped["Agent"] = relationship(back_populates="versions")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "agent_id", "git_sha", "package_version", name="uq_agent_version_identity"
+        ),
+    )
 
 
 class Trajectory(Base):
@@ -48,11 +109,28 @@ class Trajectory(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    # New in Phase 2a — populated by ingest; nullable so legacy rows exist until backfill runs.
+    agent_id: Mapped[Optional[str]] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("agents.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    agent_version_id: Mapped[Optional[str]] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("agent_versions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     spans: Mapped[list["Span"]] = relationship(
         back_populates="trajectory",
         cascade="all, delete-orphan",
         order_by="Span.started_at",
+    )
+    agent: Mapped[Optional["Agent"]] = relationship("Agent", foreign_keys=[agent_id])
+    agent_version: Mapped[Optional["AgentVersion"]] = relationship(
+        "AgentVersion", foreign_keys=[agent_version_id]
     )
 
 
