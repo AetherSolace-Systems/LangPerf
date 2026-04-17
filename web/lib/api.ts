@@ -217,6 +217,12 @@ export type FlaggedRun = {
 };
 export type HeatmapCell = { agent_name: string; tool: string; calls: number };
 
+export type MostRanAgent = {
+  name: string;
+  runs: number;
+  error_rate: number;
+};
+
 export type OverviewResponse = {
   window: string;
   kpi: OverviewKpi;
@@ -225,6 +231,7 @@ export type OverviewResponse = {
   top_tools: TopTool[];
   recent_flagged: FlaggedRun[];
   heatmap: HeatmapCell[];
+  most_ran_agents: MostRanAgent[];
 };
 
 export type TimeWindow = "24h" | "7d" | "30d";

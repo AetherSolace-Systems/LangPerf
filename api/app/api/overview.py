@@ -19,7 +19,7 @@ from app.models import Agent, Span, Trajectory
 from app.schemas import (
     EnvSplit,
     FlaggedRun,
-    HeatmapCell,
+    MostRanAgent,
     OverviewKpi,
     OverviewResponse,
     TopTool,
@@ -118,36 +118,45 @@ async def get_overview(
         total_tokens=int(total_tokens),
     )
 
-    day_bucket = func.date_trunc("day", Trajectory.started_at).label("day")
+    # Volume is pinned to the last 24h with hourly buckets regardless of the
+    # outer `window` — the dashboard uses it as an "is anything happening right
+    # now?" monitor. Empty hours are back-filled so the chart is always 24 bars.
+    vol_since = datetime.now(tz=timezone.utc) - timedelta(hours=24)
+    hour_bucket = func.date_trunc("hour", Trajectory.started_at).label("hour")
     vol_rows = (
         await session.execute(
             select(
-                day_bucket,
+                hour_bucket,
                 Trajectory.environment,
                 func.count().label("n"),
             )
-            .where(Trajectory.started_at >= since)
-            .group_by("day", Trajectory.environment)
-            .order_by("day")
+            .where(Trajectory.started_at >= vol_since)
+            .group_by("hour", Trajectory.environment)
+            .order_by("hour")
         )
     ).all()
 
-    by_day: dict[datetime, dict[str, int]] = {}
-    for day, env, n in vol_rows:
-        bucket = by_day.setdefault(day, {"prod": 0, "staging": 0, "dev": 0, "other": 0})
+    by_hour: dict[datetime, dict[str, int]] = {}
+    for hour, env, n in vol_rows:
+        bucket = by_hour.setdefault(hour, {"prod": 0, "staging": 0, "dev": 0, "other": 0})
         key = env if env in ("prod", "staging", "dev") else "other"
         bucket[key] += int(n)
 
-    volume_by_day = [
-        VolumeDay(
-            day=day,
-            prod=bucket["prod"],
-            staging=bucket["staging"],
-            dev=bucket["dev"],
-            other=bucket["other"],
+    # Backfill every hour in the 24h window so the chart always has 24 bars.
+    now_hour = datetime.now(tz=timezone.utc).replace(minute=0, second=0, microsecond=0)
+    volume_by_day: list[VolumeDay] = []
+    for i in range(24):
+        h = now_hour - timedelta(hours=23 - i)
+        b = by_hour.get(h, {"prod": 0, "staging": 0, "dev": 0, "other": 0})
+        volume_by_day.append(
+            VolumeDay(
+                day=h,
+                prod=b["prod"],
+                staging=b["staging"],
+                dev=b["dev"],
+                other=b["other"],
+            )
         )
-        for day, bucket in sorted(by_day.items())
-    ]
 
     env_rows = (
         await session.execute(
@@ -210,44 +219,31 @@ async def get_overview(
         for traj, agent_name in flagged_rows
     ]
 
-    top_agents = (
+    # Most-ran agents in the window — runs + error rate per agent, top N.
+    most_ran_rows = (
         await session.execute(
-            select(Agent.name, func.count().label("n"))
+            select(
+                Agent.name.label("name"),
+                func.count().label("runs"),
+                func.sum(
+                    func.cast(Trajectory.status_tag == "bad", Integer)
+                ).label("errors"),
+            )
             .join(Trajectory, Trajectory.agent_id == Agent.id)
             .where(Trajectory.started_at >= since)
             .group_by(Agent.name)
             .order_by(func.count().desc())
-            .limit(6)
+            .limit(10)
         )
     ).all()
-    agent_names = [row.name for row in top_agents]
-    top_tool_names = [t.tool for t in top_tools[:6]]
-
-    if agent_names and top_tool_names:
-        hm_rows = (
-            await session.execute(
-                select(
-                    Agent.name.label("agent_name"),
-                    Span.name.label("tool"),
-                    func.count().label("calls"),
-                )
-                .join(Trajectory, Trajectory.id == Span.trajectory_id)
-                .join(Agent, Agent.id == Trajectory.agent_id)
-                .where(
-                    Trajectory.started_at >= since,
-                    Span.kind.in_(("tool", "tool_call")),
-                    Agent.name.in_(agent_names),
-                    Span.name.in_(top_tool_names),
-                )
-                .group_by(Agent.name, Span.name)
-            )
-        ).all()
-        heatmap = [
-            HeatmapCell(agent_name=row.agent_name, tool=row.tool, calls=int(row.calls))
-            for row in hm_rows
-        ]
-    else:
-        heatmap = []
+    most_ran_agents = [
+        MostRanAgent(
+            name=row.name,
+            runs=int(row.runs),
+            error_rate=(int(row.errors or 0) / int(row.runs)) if int(row.runs) else 0.0,
+        )
+        for row in most_ran_rows
+    ]
 
     return OverviewResponse(
         window=window,
@@ -256,5 +252,6 @@ async def get_overview(
         env_split=env_split,
         top_tools=top_tools,
         recent_flagged=recent_flagged,
-        heatmap=heatmap,
+        heatmap=[],  # deprecated — UI no longer renders; kept for backward compat
+        most_ran_agents=most_ran_agents,
     )

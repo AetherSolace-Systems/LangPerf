@@ -204,6 +204,12 @@ class HeatmapCell(BaseModel):
     calls: int
 
 
+class MostRanAgent(BaseModel):
+    name: str
+    runs: int
+    error_rate: float
+
+
 class OverviewResponse(BaseModel):
     window: str
     kpi: OverviewKpi
@@ -211,7 +217,8 @@ class OverviewResponse(BaseModel):
     env_split: list[EnvSplit]
     top_tools: list[TopTool]
     recent_flagged: list[FlaggedRun]
-    heatmap: list[HeatmapCell]
+    heatmap: list[HeatmapCell] = []  # deprecated; UI no longer renders
+    most_ran_agents: list[MostRanAgent] = []
 
 
 class AgentMiniMetrics(BaseModel):

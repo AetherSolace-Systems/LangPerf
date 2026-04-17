@@ -16,9 +16,8 @@ import {
 import { KpiStrip } from "@/components/dashboard/kpi-strip";
 import { AgentGrid } from "@/components/dashboard/agent-grid";
 import { TopTools } from "@/components/dashboard/top-tools";
+import { MostRanAgents } from "@/components/dashboard/most-ran-agents";
 import { RecentFlagged } from "@/components/dashboard/recent-flagged";
-import { ToolAgentHeatmap } from "@/components/dashboard/tool-agent-heatmap";
-import { EnvSplitCard } from "@/components/dashboard/env-split";
 import { StackedBarChart } from "@/components/charts/bar-chart";
 import { LineChart } from "@/components/charts/line-chart";
 import { TimeRangePicker } from "@/components/agent/time-range-picker";
@@ -91,9 +90,7 @@ export default async function Dashboard({
     return (
       <AppShell
         topBar={{
-          breadcrumb: (
-            <span className="font-medium text-warm-fog">Dashboard</span>
-          ),
+          breadcrumb: <span className="font-medium text-warm-fog">Dashboard</span>,
         }}
       >
         <div
@@ -130,9 +127,12 @@ export default async function Dashboard({
     </ContextSidebar>
   );
 
-  const volumeBars = overview.volume_by_day.map((d) => {
+  // Volume bars — always last 24h in hourly buckets (24 bars). Label every 4
+  // hours; blank label elsewhere to keep the axis readable.
+  const volumeBars = overview.volume_by_day.map((d, i) => {
     const date = new Date(d.day);
-    const label = date.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase();
+    const hour = date.getHours();
+    const label = i % 4 === 0 ? `${String(hour).padStart(2, "0")}:00` : "";
     return {
       label,
       segments: [
@@ -166,8 +166,8 @@ export default async function Dashboard({
     >
       <KpiStrip kpi={overview.kpi} window={window} />
 
-      <div className="grid grid-cols-[2fr_1fr] gap-[8px] mb-[10px]">
-        <Card title={`Run volume · ${window} · by env`}>
+      <div className="grid grid-cols-1 gap-[10px] mb-[10px]">
+        <Card title="Run volume · last 24h · hourly · by env">
           <StackedBarChart bars={volumeBars} />
         </Card>
         <Card title={`Latency · p50/p95/p99 · ${window}`}>
@@ -184,15 +184,12 @@ export default async function Dashboard({
         </Card>
       </div>
 
-      <div className="grid grid-cols-[1.2fr_1fr_0.8fr] gap-[8px] mb-[10px]">
+      <div className="grid grid-cols-2 gap-[8px] mb-[10px]">
+        <Card title={`Most ran agents · ${window}`}>
+          <MostRanAgents agents={overview.most_ran_agents} />
+        </Card>
         <Card title={`Top tools · ${window}`} right="across all agents">
           <TopTools tools={overview.top_tools} />
-        </Card>
-        <Card title="Tool-by-agent heatmap">
-          <ToolAgentHeatmap cells={overview.heatmap} />
-        </Card>
-        <Card title="Env split">
-          <EnvSplitCard entries={overview.env_split} />
         </Card>
       </div>
 
