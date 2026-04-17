@@ -10,7 +10,6 @@ import {
   Controls,
   Handle,
   MarkerType,
-  MiniMap,
   Position,
   ReactFlow,
   type Edge,
@@ -282,14 +281,6 @@ export function TrajectoryGraph({
         <Controls
           showInteractive={false}
           className="!bg-deep-indigo !border !border-[color:var(--border)] !shadow-none [&_button]:!bg-deep-indigo [&_button]:!border-[color:var(--border)] [&_button]:!text-linen [&_button]:!fill-linen [&_button:hover]:!bg-drift-violet/20"
-        />
-        <MiniMap
-          className="!bg-deep-indigo !border !border-[color:var(--border)]"
-          maskColor="rgba(20,20,31,0.6)"
-          nodeColor={(n) =>
-            kindSwatch((n.data as NodeData).entity.kind).solid
-          }
-          nodeStrokeWidth={0}
         />
       </ReactFlow>
     </div>
