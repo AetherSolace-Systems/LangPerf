@@ -3,11 +3,15 @@
 @tailwind utilities;
 
 :root {
-  --background: #0b0c0f;
-  --foreground: #e6e8eb;
-  --muted: #7a8290;
-  --border: #232730;
-  --accent: #5b8cff;
+  /* Drift Signal palette */
+  --background: #14141F;     /* Midnight */
+  --surface: #1F2035;         /* Deep Indigo */
+  --foreground: #EDE7DD;      /* Linen */
+  --muted: #6E6F88;           /* Twilight */
+  --accent: #8B8CC7;          /* Drift Violet */
+  --accent-warm: #E5B754;     /* Marigold */
+  --border: #2B2B45;          /* subtle border derived from indigo */
+  --border-strong: #3A3B58;
 }
 
 html, body {
@@ -18,4 +22,31 @@ html, body {
 
 * {
   box-sizing: border-box;
+}
+
+/* Selection uses the warm accent so it stands out on the dark indigo. */
+::selection {
+  background: rgba(229, 183, 84, 0.3);
+  color: var(--foreground);
+}
+
+/* Scrollbars — subtle, on-palette */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 5px;
+  border: 2px solid var(--background);
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
 }

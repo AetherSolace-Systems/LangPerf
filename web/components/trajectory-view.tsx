@@ -9,12 +9,16 @@ import { NodeDetailPanel } from "@/components/node-detail-panel";
 import { NotesEditor } from "@/components/notes-editor";
 import { TagSelector } from "@/components/tag-selector";
 import { TrajectoryGraph } from "@/components/trajectory-graph";
+import { TrajectoryTimeline } from "@/components/trajectory-timeline";
 import { TrajectoryTree } from "@/components/trajectory-tree";
+
+type LowerView = "graph" | "timeline";
 
 export function TrajectoryView({ trajectory }: { trajectory: TrajectoryDetail }) {
   const firstSpanId = trajectory.spans[0]?.span_id ?? null;
   const [selectedId, setSelectedId] = useState<string | null>(firstSpanId);
   const [notesOpen, setNotesOpen] = useState<boolean>(!!trajectory.notes);
+  const [lowerView, setLowerView] = useState<LowerView>("timeline");
 
   const selectedSpan = useMemo(
     () =>
@@ -28,41 +32,41 @@ export function TrajectoryView({ trajectory }: { trajectory: TrajectoryDetail })
 
   return (
     <div className="h-screen flex flex-col">
-      <header className="border-b border-[var(--border)] px-6 py-3 flex-shrink-0">
+      <header className="border-b border-[color:var(--border)] px-6 py-3 flex-shrink-0">
         <Link
           href="/"
-          className="text-xs text-[var(--muted)] hover:text-[var(--foreground)]"
+          className="text-xs text-twilight hover:text-linen"
         >
           ← all trajectories
         </Link>
         <div className="mt-1 flex items-baseline gap-3 flex-wrap">
           <h1 className="text-base font-semibold tracking-tight">
             {trajectory.name ?? (
-              <em className="text-[var(--muted)] font-normal">(unnamed)</em>
+              <em className="text-twilight font-normal">(unnamed)</em>
             )}
           </h1>
-          <span className="text-xs font-mono text-[var(--muted)]">
+          <span className="text-xs font-mono text-twilight">
             {trajectory.id.slice(0, 8)}…
           </span>
-          <span className="text-xs text-[var(--muted)]">·</span>
-          <span className="text-xs text-[var(--muted)]">
+          <Dot />
+          <span className="text-xs text-twilight">
             {trajectory.service_name}
             {trajectory.environment ? ` · ${trajectory.environment}` : ""}
           </span>
-          <span className="text-xs text-[var(--muted)]">·</span>
-          <span className="text-xs text-[var(--muted)] tabular-nums">
+          <Dot />
+          <span className="text-xs text-twilight tabular-nums">
             {trajectory.step_count} step{trajectory.step_count === 1 ? "" : "s"}
           </span>
-          <span className="text-xs text-[var(--muted)]">·</span>
-          <span className="text-xs text-[var(--muted)] tabular-nums">
+          <Dot />
+          <span className="text-xs text-twilight tabular-nums">
             {trajectory.token_count.toLocaleString()}t
           </span>
-          <span className="text-xs text-[var(--muted)]">·</span>
-          <span className="text-xs text-[var(--muted)] tabular-nums">
+          <Dot />
+          <span className="text-xs text-twilight tabular-nums">
             {fmtDuration(trajectory.duration_ms)}
           </span>
-          <span className="text-xs text-[var(--muted)]">·</span>
-          <span className="text-xs text-[var(--muted)]">
+          <Dot />
+          <span className="text-xs text-twilight">
             <ClientTime iso={trajectory.started_at} />
           </span>
         </div>
@@ -75,7 +79,7 @@ export function TrajectoryView({ trajectory }: { trajectory: TrajectoryDetail })
           <button
             type="button"
             onClick={() => setNotesOpen((v) => !v)}
-            className="text-[10px] uppercase tracking-wider text-[var(--muted)] hover:text-[var(--foreground)] border border-[var(--border)] rounded px-2 py-0.5"
+            className="text-[10px] uppercase tracking-wider text-twilight hover:text-linen border border-[color:var(--border)] rounded px-2 py-0.5"
           >
             {notesOpen ? "hide notes" : trajectory.notes ? "notes" : "+ notes"}
           </button>
@@ -93,11 +97,9 @@ export function TrajectoryView({ trajectory }: { trajectory: TrajectoryDetail })
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        <div className="flex-1 min-w-0 flex flex-col border-r border-[var(--border)]">
-          <div className="flex-shrink-0 overflow-y-auto max-h-[40%] border-b border-[var(--border)]">
-            <div className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-[var(--muted)] bg-black/20 sticky top-0 border-b border-[var(--border)]">
-              Tree
-            </div>
+        <div className="flex-1 min-w-0 flex flex-col border-r border-[color:var(--border)]">
+          <SectionHeader label="Tree" />
+          <div className="flex-shrink-0 overflow-y-auto max-h-[30%] border-b border-[color:var(--border)]">
             <TrajectoryTree
               spans={trajectory.spans}
               selectedId={selectedId}
@@ -105,15 +107,39 @@ export function TrajectoryView({ trajectory }: { trajectory: TrajectoryDetail })
             />
           </div>
           <div className="flex-1 min-h-0 flex flex-col">
-            <div className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-[var(--muted)] bg-black/20 flex-shrink-0 border-b border-[var(--border)]">
-              Graph
-            </div>
+            <SectionHeader
+              label={lowerView === "graph" ? "Graph" : "Timeline"}
+              right={
+                <div className="flex gap-1">
+                  <ToggleButton
+                    active={lowerView === "timeline"}
+                    onClick={() => setLowerView("timeline")}
+                  >
+                    timeline
+                  </ToggleButton>
+                  <ToggleButton
+                    active={lowerView === "graph"}
+                    onClick={() => setLowerView("graph")}
+                  >
+                    graph
+                  </ToggleButton>
+                </div>
+              }
+            />
             <div className="flex-1 min-h-0">
-              <TrajectoryGraph
-                spans={trajectory.spans}
-                selectedId={selectedId}
-                onSelect={handleSelect}
-              />
+              {lowerView === "graph" ? (
+                <TrajectoryGraph
+                  spans={trajectory.spans}
+                  selectedId={selectedId}
+                  onSelect={handleSelect}
+                />
+              ) : (
+                <TrajectoryTimeline
+                  spans={trajectory.spans}
+                  selectedId={selectedId}
+                  onSelect={handleSelect}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -122,5 +148,48 @@ export function TrajectoryView({ trajectory }: { trajectory: TrajectoryDetail })
         </div>
       </div>
     </div>
+  );
+}
+
+function Dot() {
+  return <span className="text-xs text-twilight">·</span>;
+}
+
+function SectionHeader({
+  label,
+  right,
+}: {
+  label: string;
+  right?: React.ReactNode;
+}) {
+  return (
+    <div className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-twilight bg-midnight/40 flex-shrink-0 border-b border-[color:var(--border)] flex items-center justify-between">
+      <span>{label}</span>
+      {right}
+    </div>
+  );
+}
+
+function ToggleButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-2 py-0.5 rounded border text-[10px] uppercase tracking-wider transition-colors ${
+        active
+          ? "border-drift-violet text-drift-violet bg-drift-violet/10"
+          : "border-[color:var(--border)] text-twilight hover:text-linen hover:border-twilight"
+      }`}
+    >
+      {children}
+    </button>
   );
 }

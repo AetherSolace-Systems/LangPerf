@@ -1,34 +1,29 @@
 "use client";
 
 import type { Span } from "@/lib/api";
+import { roleSwatch } from "@/lib/colors";
 import { fmtDuration } from "@/lib/format";
 import { extractLlmFields, type LlmMessage } from "@/lib/span-fields";
 
-const roleStyles: Record<string, string> = {
-  system: "bg-amber-500/10 border-amber-500/30 text-amber-200",
-  user: "bg-sky-500/10 border-sky-500/30 text-sky-200",
-  assistant: "bg-emerald-500/10 border-emerald-500/30 text-emerald-200",
-  tool: "bg-violet-500/10 border-violet-500/30 text-violet-200",
-  developer: "bg-orange-500/10 border-orange-500/30 text-orange-200",
-};
-
 function MessageCard({ message }: { message: LlmMessage }) {
-  const cls =
-    roleStyles[message.role] ??
-    "bg-[var(--border)]/30 border-[var(--border)] text-[var(--foreground)]";
+  const swatch = roleSwatch(message.role);
   return (
-    <div className={`border rounded-md ${cls}`}>
-      <div className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider border-b border-current/20">
+    <div
+      className="border rounded-md"
+      style={{ borderColor: swatch.border, background: swatch.bg }}
+    >
+      <div
+        className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider border-b"
+        style={{ color: swatch.fg, borderColor: swatch.border }}
+      >
         {message.role}
       </div>
-      <div className="p-3 text-sm whitespace-pre-wrap break-words text-[var(--foreground)]/90">
+      <div className="p-3 text-sm whitespace-pre-wrap break-words text-linen/90">
         {message.content ??
           (message.tool_calls?.length ? (
-            <span className="text-[var(--muted)] italic">
-              (tool calls only)
-            </span>
+            <span className="text-twilight italic">(tool calls only)</span>
           ) : (
-            <span className="text-[var(--muted)] italic">(no content)</span>
+            <span className="text-twilight italic">(no content)</span>
           ))}
       </div>
       {message.tool_calls?.length ? (
@@ -36,15 +31,16 @@ function MessageCard({ message }: { message: LlmMessage }) {
           {message.tool_calls.map((tc, idx) => (
             <div
               key={idx}
-              className="text-xs font-mono bg-black/40 rounded border border-current/20 p-2"
+              className="text-xs font-mono bg-midnight/60 rounded border p-2"
+              style={{ borderColor: swatch.border }}
             >
-              <div>
-                <span className="text-[var(--muted)]">→</span> {tc.name}
+              <div style={{ color: swatch.fg }}>
+                <span className="text-twilight">→</span> {tc.name}
                 {tc.id ? (
-                  <span className="text-[var(--muted)] ml-2">({tc.id})</span>
+                  <span className="text-twilight ml-2">({tc.id})</span>
                 ) : null}
               </div>
-              <pre className="mt-1 text-[var(--muted)] overflow-x-auto">
+              <pre className="mt-1 text-twilight overflow-x-auto">
                 {typeof tc.arguments === "string"
                   ? tc.arguments
                   : JSON.stringify(tc.arguments, null, 2)}
@@ -63,14 +59,14 @@ export function LlmSpanView({ span }: { span: Span }) {
   return (
     <div className="space-y-5">
       <section>
-        <h3 className="text-[10px] uppercase tracking-wider text-[var(--muted)] mb-2">
+        <h3 className="text-[10px] uppercase tracking-wider text-twilight mb-2">
           Model
         </h3>
         <div className="font-mono text-sm">
           {f.system ? (
-            <span className="text-[var(--muted)]">{f.system} · </span>
+            <span className="text-twilight">{f.system} · </span>
           ) : null}
-          {f.model ?? <span className="text-[var(--muted)]">unknown</span>}
+          {f.model ?? <span className="text-twilight">unknown</span>}
         </div>
       </section>
 
@@ -85,7 +81,7 @@ export function LlmSpanView({ span }: { span: Span }) {
 
       {f.input_messages.length > 0 ? (
         <section>
-          <h3 className="text-[10px] uppercase tracking-wider text-[var(--muted)] mb-2">
+          <h3 className="text-[10px] uppercase tracking-wider text-twilight mb-2">
             Input messages
           </h3>
           <div className="space-y-2">
@@ -98,7 +94,7 @@ export function LlmSpanView({ span }: { span: Span }) {
 
       {f.output_messages.length > 0 ? (
         <section>
-          <h3 className="text-[10px] uppercase tracking-wider text-[var(--muted)] mb-2">
+          <h3 className="text-[10px] uppercase tracking-wider text-twilight mb-2">
             Output
           </h3>
           <div className="space-y-2">
@@ -145,7 +141,7 @@ function Stat({
 }) {
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wider text-[var(--muted)]">
+      <div className="text-[10px] uppercase tracking-wider text-twilight">
         {label}
       </div>
       <div className="font-mono text-sm tabular-nums mt-0.5">
@@ -164,11 +160,11 @@ function Collapsible({
   children: React.ReactNode;
 }) {
   return (
-    <details className="border border-[var(--border)] rounded-md">
-      <summary className="cursor-pointer px-3 py-2 text-xs uppercase tracking-wider text-[var(--muted)] select-none">
+    <details className="border border-[color:var(--border)] rounded-md">
+      <summary className="cursor-pointer px-3 py-2 text-xs uppercase tracking-wider text-twilight select-none">
         {title}
       </summary>
-      <div className="px-3 pb-3 bg-black/20">{children}</div>
+      <div className="px-3 pb-3 bg-midnight/50">{children}</div>
     </details>
   );
 }
