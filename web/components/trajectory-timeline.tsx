@@ -87,6 +87,12 @@ export function TrajectoryTimeline({
   const [containerWidth, setContainerWidth] = useState<number>(800);
   const [pxPerMs, setPxPerMs] = useState<number | null>(null);
 
+  // Hydration-safe flag: any wall-clock text renders empty on the server + first
+  // client render (so SSR and hydration match), then flips true after mount to
+  // reveal the user's local timezone. Same pattern ClientTime uses elsewhere.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   // Observe scroll container size so "fit" works after layout.
   useLayoutEffect(() => {
     if (!scrollRef.current) return;
@@ -149,11 +155,15 @@ export function TrajectoryTimeline({
       />
       <div className="absolute top-2 left-4 z-30 text-[10px] font-mono text-twilight pointer-events-none">
         <span className="text-linen/80">
-          {fmtDate(trajectoryStartMs)}
+          {mounted ? fmtDate(trajectoryStartMs) : ""}
         </span>
         <span className="ml-2">
-          {fmtWallTime(trajectoryStartMs, { ms: true })} →{" "}
-          {fmtWallTime(trajectoryEndMs, { ms: true })}
+          {mounted
+            ? `${fmtWallTime(trajectoryStartMs, { ms: true })} → ${fmtWallTime(
+                trajectoryEndMs,
+                { ms: true },
+              )}`
+            : ""}
         </span>
         <span className="ml-2">({fmtDuration(totalMs)})</span>
       </div>
@@ -192,7 +202,7 @@ export function TrajectoryTimeline({
                 >
                   <div className="w-px h-2 bg-[color:var(--border-strong)]" />
                   <span className="text-[10px] text-twilight tabular-nums mt-0.5 px-1 whitespace-nowrap">
-                    {fmtTickTime(absMs, tickIntervalMs)}
+                    {mounted ? fmtTickTime(absMs, tickIntervalMs) : ""}
                   </span>
                 </div>
               );
