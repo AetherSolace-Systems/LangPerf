@@ -1,34 +1,21 @@
 """Decode OTLP trace payloads (protobuf or JSON) into plain Python dicts.
 
-We normalize into a shape that mirrors OTel's semantic model closely:
+The output shape is declared as `DecodedBundle` / `DecodedSpan` TypedDicts so
+the receiver and ingest layer can read fields with mypy / IDE help instead of
+indexing `dict[str, Any]` by hand.
 
     {
         "resource": { "attrs": {...} },
-        "spans": [
-            {
-                "trace_id": "hex",
-                "span_id": "hex",
-                "parent_span_id": "hex" | None,
-                "name": str,
-                "kind": str,                      # OTel SpanKind name
-                "start_time_unix_nano": int,
-                "end_time_unix_nano": int,
-                "attributes": {...},              # flattened str->primitive
-                "events": [...],
-                "status": {"code": str, "message": str},
-                "scope": {"name": str, "version": str | None},
-            },
-            ...
-        ]
+        "spans": [ DecodedSpan, ... ],
     }
 
-The attribute bag merges span attributes only (not resource) per span dict; resource
-attributes are carried separately so the receiver can apply them uniformly to each span.
+Resource attributes are carried on the bundle (not merged into each span) so
+the ingest layer can apply them uniformly to every span from that resource.
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, TypedDict
 
 from google.protobuf.json_format import Parse
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
@@ -53,7 +40,46 @@ _STATUS_CODE_NAMES = {
 }
 
 
-def decode(body: bytes, content_type: str) -> list[dict[str, Any]]:
+class DecodedStatus(TypedDict):
+    code: str
+    message: str
+
+
+class DecodedScope(TypedDict):
+    name: str | None
+    version: str | None
+
+
+class DecodedEvent(TypedDict):
+    name: str
+    time_unix_nano: int
+    attributes: dict[str, Any]
+
+
+class DecodedSpan(TypedDict):
+    trace_id: str | None
+    span_id: str | None
+    parent_span_id: str | None
+    name: str
+    kind: str  # OTel SpanKind name (see _SPAN_KIND_NAMES)
+    start_time_unix_nano: int
+    end_time_unix_nano: int
+    attributes: dict[str, Any]
+    events: list[DecodedEvent]
+    status: DecodedStatus
+    scope: DecodedScope
+
+
+class DecodedResource(TypedDict):
+    attrs: dict[str, Any]
+
+
+class DecodedBundle(TypedDict):
+    resource: DecodedResource
+    spans: list[DecodedSpan]
+
+
+def decode(body: bytes, content_type: str) -> list[DecodedBundle]:
     """Decode a raw OTLP body into a list of resource-grouped span bundles."""
     req = ExportTraceServiceRequest()
     if "json" in content_type.lower():
@@ -61,12 +87,12 @@ def decode(body: bytes, content_type: str) -> list[dict[str, Any]]:
     else:
         req.ParseFromString(body)
 
-    bundles: list[dict[str, Any]] = []
+    bundles: list[DecodedBundle] = []
     for rs in req.resource_spans:
         resource_attrs = _kv_list_to_dict(rs.resource.attributes)
-        spans_out: list[dict[str, Any]] = []
+        spans_out: list[DecodedSpan] = []
         for ss in rs.scope_spans:
-            scope = {
+            scope: DecodedScope = {
                 "name": ss.scope.name or None,
                 "version": ss.scope.version or None,
             }
@@ -76,7 +102,7 @@ def decode(body: bytes, content_type: str) -> list[dict[str, Any]]:
     return bundles
 
 
-def _convert_span(span: PbSpan, scope: dict[str, Any]) -> dict[str, Any]:
+def _convert_span(span: PbSpan, scope: DecodedScope) -> DecodedSpan:
     return {
         "trace_id": span.trace_id.hex() if span.trace_id else None,
         "span_id": span.span_id.hex() if span.span_id else None,

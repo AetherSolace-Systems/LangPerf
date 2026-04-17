@@ -15,11 +15,14 @@ from opentelemetry import baggage, context as context_api
 from opentelemetry.context.context import Context
 from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
 
-BAGGAGE_TRAJECTORY_ID = "langperf.trajectory.id"
-BAGGAGE_TRAJECTORY_NAME = "langperf.trajectory.name"
+from langperf.attributes import TRAJECTORY_ID, TRAJECTORY_NAME
 
-ATTR_TRAJECTORY_ID = "langperf.trajectory.id"
-ATTR_TRAJECTORY_NAME = "langperf.trajectory.name"
+# Baggage keys reuse the attribute names — baggage name == final span attribute.
+BAGGAGE_TRAJECTORY_ID = TRAJECTORY_ID
+BAGGAGE_TRAJECTORY_NAME = TRAJECTORY_NAME
+
+ATTR_TRAJECTORY_ID = TRAJECTORY_ID
+ATTR_TRAJECTORY_NAME = TRAJECTORY_NAME
 
 
 class LangPerfBaggageSpanProcessor(SpanProcessor):

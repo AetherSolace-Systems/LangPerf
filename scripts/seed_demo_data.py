@@ -3,15 +3,14 @@
     pip install -e ./sdk
     python scripts/seed_demo_data.py
 
-Generates ~7 trajectories with different shapes — multi-tool, multi-agent
+Generates ~8 trajectories with different shapes — multi-tool, multi-agent
 supervisor, parallel calls, retries with errors, deep reasoning chains,
-nested sub-agents — spread across the last 24 hours so the UI has realistic
-variety to browse and filter.
+nested sub-agents, parallel sub-agent fan-out — spread across the last 24
+hours so the UI has realistic variety to browse and filter.
 
-No external LLM required. All spans are synthesized directly via OTel with
-OpenInference-style attributes, so the UI renders them exactly like real
-instrumented traces. Span start/end times are set explicitly via a
-simulated clock, giving each node a realistic duration without actually
+No external LLM required. All spans are synthesized via `scripts.demo_tracer`,
+which emits OpenInference-shaped spans with explicit start/end times so the
+UI renders them exactly like real instrumented traces, without actually
 sleeping for seconds per call.
 """
 
@@ -19,267 +18,19 @@ from __future__ import annotations
 
 import json
 import random
-import time
-import uuid
-from contextlib import contextmanager
-from typing import Any, Iterator
 
 import langperf
-from opentelemetry import trace as trace_api
-from opentelemetry.trace import Status, StatusCode, use_span
 
-# --------------------------------------------------------------------------- #
-# Simulated clock                                                              #
-# --------------------------------------------------------------------------- #
-
-_NS_PER_MS = 1_000_000
-
-# Start cursor 24 hours ago, so trajectories spread across the last day.
-_cursor_ns = int(time.time_ns()) - 24 * 60 * 60 * 1000 * _NS_PER_MS
-
-
-def _advance_ms(ms: float) -> int:
-    global _cursor_ns
-    _cursor_ns += int(ms * _NS_PER_MS)
-    return _cursor_ns
-
-
-def _jump_between_trajectories() -> None:
-    """Jump forward 3-120 minutes between trajectories for realistic spacing."""
-    _advance_ms(random.uniform(3 * 60 * 1000, 120 * 60 * 1000))
-
-
-def parallel_branches(branches: list) -> None:
-    """Run each branch as if concurrent: each starts at the same simulated
-    time, and the cursor is advanced to the latest branch end when all finish.
-
-    Each entry in `branches` is a callable that emits spans (leaves, agents,
-    llms, tools, etc). The shared cursor is rewound to the pre-block value
-    before each branch runs, so they all have overlapping start times — the
-    shape real parallel agent dispatch produces on a timeline.
-    """
-    global _cursor_ns
-    start = _cursor_ns
-    ends: list[int] = []
-    for branch in branches:
-        _cursor_ns = start
-        branch()
-        ends.append(_cursor_ns)
-    _cursor_ns = max(ends) if ends else start
-
-
-# --------------------------------------------------------------------------- #
-# Span primitives                                                              #
-# --------------------------------------------------------------------------- #
-
-_tracer = None
-_current_traj_id: str | None = None
-_current_traj_name: str | None = None
-
-
-def _tracer_obj():
-    global _tracer
-    if _tracer is None:
-        _tracer = trace_api.get_tracer("langperf.demo_seed")
-    return _tracer
-
-
-def _stamp_trajectory(span) -> None:
-    if _current_traj_id:
-        span.set_attribute("langperf.trajectory.id", _current_traj_id)
-    if _current_traj_name:
-        span.set_attribute("langperf.trajectory.name", _current_traj_name)
-
-
-@contextmanager
-def fake_trajectory(name: str, own_duration_ms: float = 5) -> Iterator[None]:
-    """Open a trajectory root span with an explicit time range."""
-    global _current_traj_id, _current_traj_name
-    _jump_between_trajectories()
-    _current_traj_id = str(uuid.uuid4())
-    _current_traj_name = name
-    tracer = _tracer_obj()
-    start = _cursor_ns
-    span = tracer.start_span(name, start_time=start)
-    span.set_attribute("langperf.node.kind", "trajectory")
-    _stamp_trajectory(span)
-    try:
-        with use_span(span, end_on_exit=False):
-            yield
-    finally:
-        _advance_ms(own_duration_ms)
-        span.end(end_time=_cursor_ns)
-        _current_traj_id = None
-        _current_traj_name = None
-
-
-@contextmanager
-def fake_agent(
-    name: str, description: str = "", own_duration_ms: float = 3
-) -> Iterator[None]:
-    """Open a nested agent scope. Children nest under it."""
-    tracer = _tracer_obj()
-    start = _cursor_ns
-    span = tracer.start_span(name, start_time=start)
-    span.set_attribute("langperf.node.kind", "agent")
-    span.set_attribute("langperf.node.name", name)
-    if description:
-        span.set_attribute("langperf.note", description)
-    _stamp_trajectory(span)
-    try:
-        with use_span(span, end_on_exit=False):
-            yield
-    finally:
-        _advance_ms(own_duration_ms)
-        span.end(end_time=_cursor_ns)
-
-
-def fake_llm(
-    *,
-    name: str = "ChatCompletion",
-    system: str,
-    user: str,
-    response: str = "",
-    tool_calls: list[dict] | None = None,
-    model: str = "gpt-4o",
-    prompt_tok: int = 0,
-    completion_tok: int = 0,
-    duration_ms: float = 150,
-    status: str = "OK",
-) -> None:
-    """Synthesize an OpenInference-style LLM span with explicit time range."""
-    tracer = _tracer_obj()
-    start = _cursor_ns
-    span = tracer.start_span(name, start_time=start)
-    try:
-        _stamp_trajectory(span)
-        span.set_attribute("openinference.span.kind", "LLM")
-        span.set_attribute("llm.system", "openai")
-        span.set_attribute("llm.model_name", model)
-        span.set_attribute(
-            "llm.invocation_parameters",
-            json.dumps({"model": model, "temperature": 0.7}),
-        )
-
-        messages: list[dict[str, Any]] = []
-        if system:
-            messages.append({"role": "system", "content": system})
-        messages.append({"role": "user", "content": user})
-
-        for i, m in enumerate(messages):
-            span.set_attribute(f"llm.input_messages.{i}.message.role", m["role"])
-            span.set_attribute(
-                f"llm.input_messages.{i}.message.content", m["content"]
-            )
-
-        span.set_attribute("llm.output_messages.0.message.role", "assistant")
-        if response:
-            span.set_attribute("llm.output_messages.0.message.content", response)
-        if tool_calls:
-            for j, tc in enumerate(tool_calls):
-                base = f"llm.output_messages.0.message.tool_calls.{j}.tool_call"
-                span.set_attribute(f"{base}.function.name", tc["name"])
-                span.set_attribute(
-                    f"{base}.function.arguments", json.dumps(tc.get("args", {}))
-                )
-                if "id" in tc:
-                    span.set_attribute(f"{base}.id", tc["id"])
-
-        if prompt_tok:
-            span.set_attribute("llm.token_count.prompt", prompt_tok)
-        if completion_tok:
-            span.set_attribute("llm.token_count.completion", completion_tok)
-        if prompt_tok and completion_tok:
-            span.set_attribute("llm.token_count.total", prompt_tok + completion_tok)
-
-        span.set_attribute(
-            "input.value", json.dumps({"messages": messages, "model": model})
-        )
-        span.set_attribute("input.mime_type", "application/json")
-
-        output_content: dict[str, Any] = {"role": "assistant", "content": response or ""}
-        if tool_calls:
-            output_content["tool_calls"] = [
-                {
-                    "id": tc.get("id", f"call_{j}"),
-                    "function": {
-                        "name": tc["name"],
-                        "arguments": json.dumps(tc.get("args", {})),
-                    },
-                }
-                for j, tc in enumerate(tool_calls)
-            ]
-        span.set_attribute(
-            "output.value",
-            json.dumps(
-                {
-                    "choices": [{"message": output_content}],
-                    "model": model,
-                    "usage": {
-                        "prompt_tokens": prompt_tok,
-                        "completion_tokens": completion_tok,
-                        "total_tokens": prompt_tok + completion_tok,
-                    },
-                }
-            ),
-        )
-        span.set_attribute("output.mime_type", "application/json")
-
-        if status == "ERROR":
-            span.set_status(Status(StatusCode.ERROR, "demo error"))
-    finally:
-        _advance_ms(duration_ms)
-        span.end(end_time=_cursor_ns)
-
-
-def fake_tool(
-    *,
-    name: str,
-    args: Any,
-    result: Any = None,
-    description: str = "",
-    duration_ms: float = 80,
-    status: str = "OK",
-) -> None:
-    """Synthesize a tool_call span."""
-    tracer = _tracer_obj()
-    start = _cursor_ns
-    span = tracer.start_span(name, start_time=start)
-    try:
-        _stamp_trajectory(span)
-        span.set_attribute("openinference.span.kind", "TOOL")
-        span.set_attribute("langperf.node.kind", "tool_call")
-        span.set_attribute("langperf.node.name", name)
-        span.set_attribute("tool.name", name)
-        if description:
-            span.set_attribute("tool.description", description)
-        args_str = args if isinstance(args, str) else json.dumps(args)
-        span.set_attribute("input.value", args_str)
-        span.set_attribute("input.mime_type", "application/json")
-        if result is not None:
-            result_str = result if isinstance(result, str) else json.dumps(result)
-            span.set_attribute("output.value", result_str)
-            span.set_attribute("output.mime_type", "application/json")
-        if status == "ERROR":
-            span.set_status(Status(StatusCode.ERROR, "demo error"))
-    finally:
-        _advance_ms(duration_ms)
-        span.end(end_time=_cursor_ns)
-
-
-def fake_reasoning(*, name: str, thought: str = "", duration_ms: float = 30) -> None:
-    tracer = _tracer_obj()
-    start = _cursor_ns
-    span = tracer.start_span(name, start_time=start)
-    try:
-        _stamp_trajectory(span)
-        span.set_attribute("langperf.node.kind", "reasoning")
-        span.set_attribute("langperf.node.name", name)
-        if thought:
-            span.set_attribute("langperf.note", thought)
-    finally:
-        _advance_ms(duration_ms)
-        span.end(end_time=_cursor_ns)
+# scripts/ is not a package; when `seed_demo_data.py` is run directly Python
+# adds this directory to sys.path so the sibling module import just works.
+from demo_tracer import (
+    fake_agent,
+    fake_llm,
+    fake_reasoning,
+    fake_tool,
+    fake_trajectory,
+    parallel_branches,
+)
 
 
 # --------------------------------------------------------------------------- #

@@ -13,6 +13,7 @@
 
 import type { Span } from "@/lib/api";
 import { kindOf } from "@/lib/span-fields";
+import { buildTree, type TreeNode } from "@/lib/tree";
 
 export type FrameKind = "trajectory" | "agent" | "parallel" | "container";
 
@@ -50,37 +51,23 @@ export function buildSequenceLayout(spans: Span[]): {
 } {
   if (spans.length === 0) return { all: [], rootIds: [], maxExecOrder: 0 };
 
-  const byId = new Map<string, Span>(spans.map((s) => [s.span_id, s]));
-  const childrenOf = new Map<string, Span[]>();
-  for (const s of spans) {
-    const pid = s.parent_span_id;
-    if (!pid || !byId.has(pid)) continue;
-    const list = childrenOf.get(pid) ?? [];
-    list.push(s);
-    childrenOf.set(pid, list);
-  }
-  for (const list of childrenOf.values()) {
-    list.sort(byStart);
-  }
-
-  const rootSpans = spans
-    .filter((s) => !s.parent_span_id || !byId.has(s.parent_span_id))
-    .sort(byStart);
+  // Delegate parent/child + sort-by-start to the canonical tree builder.
+  // Sequence layout is the only other consumer of that relationship — we
+  // own the overlap-detection and sizing on top, not the tree walk itself.
+  const roots = buildTree(spans);
 
   const all: LayoutNode[] = [];
   const counter = { n: 0 };
   const rootIds: string[] = [];
 
-  // If we have exactly one root of kind=trajectory we render it as the
-  // outermost frame. Otherwise we build per-root nodes at the viewport root.
-  for (const rootSpan of rootSpans) {
-    const node = buildNode(rootSpan, childrenOf, counter, null, all);
+  for (const root of roots) {
+    const node = buildNode(root, counter, null, all);
     rootIds.push(node.id);
   }
 
   // Layout: position relative to each parent.
-  for (const root of all.filter((n) => !n.parentId)) {
-    positionChildren(root, all);
+  for (const n of all.filter((x) => !x.parentId)) {
+    positionChildren(n, all);
   }
 
   // Stack multiple root frames vertically (spaced) if there are several.
@@ -96,23 +83,19 @@ export function buildSequenceLayout(spans: Span[]): {
   return { all, rootIds, maxExecOrder: counter.n };
 }
 
-function byStart(a: Span, b: Span): number {
-  return new Date(a.started_at).getTime() - new Date(b.started_at).getTime();
-}
-
 function endMsOf(s: Span): number {
   if (s.ended_at) return new Date(s.ended_at).getTime();
   return new Date(s.started_at).getTime() + (s.duration_ms ?? 0);
 }
 
 function buildNode(
-  span: Span,
-  childrenOf: Map<string, Span[]>,
+  treeNode: TreeNode,
   counter: { n: number },
   parentId: string | null,
   all: LayoutNode[],
 ): LayoutNode {
-  const rawChildren = childrenOf.get(span.span_id) ?? [];
+  const span = treeNode.span;
+  const rawChildren = treeNode.children; // already sorted by start_at in buildTree
   const k = kindOf(span);
 
   if (rawChildren.length === 0) {
@@ -159,12 +142,12 @@ function buildNode(
   const frameChildIds: string[] = [];
   for (const group of groups) {
     if (group.length === 1) {
-      const c = buildNode(group[0], childrenOf, counter, frameNode.id, all);
+      const c = buildNode(group[0], counter, frameNode.id, all);
       frameChildIds.push(c.id);
     } else {
       // Synthetic parallel frame
       const parId = `par:${span.span_id}:${group
-        .map((s) => s.span_id.slice(0, 6))
+        .map((s) => s.span.span_id.slice(0, 6))
         .join(",")}`;
       const parNode: LayoutNode = {
         id: parId,
@@ -182,7 +165,7 @@ function buildNode(
       all.push(parNode);
       const parChildIds: string[] = [];
       for (const s of group) {
-        const c = buildNode(s, childrenOf, counter, parNode.id, all);
+        const c = buildNode(s, counter, parNode.id, all);
         parChildIds.push(c.id);
       }
       // Size parallel frame (horizontal layout of branches)
@@ -239,22 +222,22 @@ function positionChildren(node: LayoutNode, all: LayoutNode[]): void {
   }
 }
 
-function groupByParallel(siblings: Span[]): Span[][] {
+function groupByParallel(siblings: TreeNode[]): TreeNode[][] {
   if (siblings.length === 0) return [];
-  const groups: Span[][] = [];
-  let current: Span[] = [siblings[0]];
-  let currentEnd = endMsOf(siblings[0]);
+  const groups: TreeNode[][] = [];
+  let current: TreeNode[] = [siblings[0]];
+  let currentEnd = endMsOf(siblings[0].span);
   for (let i = 1; i < siblings.length; i++) {
-    const s = siblings[i];
-    const startMs = new Date(s.started_at).getTime();
+    const tn = siblings[i];
+    const startMs = new Date(tn.span.started_at).getTime();
     if (startMs < currentEnd - PARALLEL_TOLERANCE_MS) {
       // overlaps with the running group → parallel
-      current.push(s);
-      currentEnd = Math.max(currentEnd, endMsOf(s));
+      current.push(tn);
+      currentEnd = Math.max(currentEnd, endMsOf(tn.span));
     } else {
       groups.push(current);
-      current = [s];
-      currentEnd = endMsOf(s);
+      current = [tn];
+      currentEnd = endMsOf(tn.span);
     }
   }
   groups.push(current);

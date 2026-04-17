@@ -2,7 +2,7 @@
 
 A trajectory is a set of spans that share a "trajectory id". The SDK stamps
 `langperf.trajectory.id` onto every span in a `with langperf.trajectory(...)`
-block (M4+). When that attribute is absent — e.g. raw OpenInference without our
+block. When that attribute is absent — e.g. raw OpenInference without our
 SDK, or ingestion from a third-party OTel source — we fall back to the OTel
 `trace_id`, so trajectories still group usefully.
 
@@ -13,6 +13,13 @@ from __future__ import annotations
 
 import uuid
 from typing import Any, Optional
+
+from app.constants import (
+    ATTR_DEPLOYMENT_ENVIRONMENT,
+    ATTR_SERVICE_NAME,
+    ATTR_TRAJECTORY_ID,
+    ATTR_TRAJECTORY_NAME,
+)
 
 
 def trace_id_to_uuid(trace_id: str) -> str:
@@ -25,7 +32,7 @@ def trace_id_to_uuid(trace_id: str) -> str:
 
 def resolve_trajectory_id(span: dict[str, Any]) -> str:
     """Return the UUID of the trajectory this span belongs to."""
-    explicit = span.get("attributes", {}).get("langperf.trajectory.id")
+    explicit = span.get("attributes", {}).get(ATTR_TRAJECTORY_ID)
     if explicit:
         # SDK-generated UUID. Accept both canonical and hex forms.
         return str(uuid.UUID(str(explicit)))
@@ -36,12 +43,12 @@ def resolve_trajectory_name(
     span: dict[str, Any], resource_attrs: dict[str, Any]
 ) -> Optional[str]:
     """Return the trajectory name if available."""
-    return span.get("attributes", {}).get("langperf.trajectory.name") or None
+    return span.get("attributes", {}).get(ATTR_TRAJECTORY_NAME) or None
 
 
 def resolve_service_name(resource_attrs: dict[str, Any]) -> str:
-    return resource_attrs.get("service.name", "unknown")
+    return resource_attrs.get(ATTR_SERVICE_NAME, "unknown")
 
 
 def resolve_environment(resource_attrs: dict[str, Any]) -> Optional[str]:
-    return resource_attrs.get("deployment.environment")
+    return resource_attrs.get(ATTR_DEPLOYMENT_ENVIRONMENT)

@@ -9,6 +9,7 @@ from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.constants import ALLOWED_TAGS
 from app.db import get_session
 from app.models import Span, Trajectory
 from app.schemas import (
@@ -18,8 +19,6 @@ from app.schemas import (
     TrajectoryPatch,
     TrajectorySummary,
 )
-
-ALLOWED_TAGS = {"good", "bad", "interesting", "todo"}
 
 router = APIRouter(prefix="/api/trajectories")
 
