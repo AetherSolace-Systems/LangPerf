@@ -20,6 +20,9 @@ import {
 } from "@/lib/api";
 import { IdentityStrip } from "@/components/agent/identity-strip";
 import { RunsTable } from "@/components/agent/runs-table";
+import { VersionsTimeline } from "@/components/agent/versions-timeline";
+import { ToolsTable } from "@/components/agent/tools-table";
+import { ConfigForm } from "@/components/agent/config-form";
 import { TopTools } from "@/components/dashboard/top-tools";
 import { TokensCostChart } from "@/components/charts/tokens-cost-chart";
 import { LineChart } from "@/components/charts/line-chart";
@@ -76,15 +79,20 @@ function V2Card({ label, body }: { label: string; body: string }) {
   );
 }
 
-function PlaceholderTab({ name, tab }: { name: string; tab: string }) {
+function PromptPlaceholder({ name }: { name: string }) {
   return (
-    <div className="border border-[color:var(--border)] border-l-2 border-l-peach-neon rounded-[3px] bg-[color:var(--surface)] p-[14px]">
+    <div className="border border-[color:var(--border)] border-l-2 border-l-peach-neon rounded-[3px] bg-[color:var(--surface)] p-[14px] max-w-[760px]">
       <div className="font-mono text-[9px] text-peach-neon uppercase tracking-[0.1em] mb-[4px]">
-        follow-up · {tab}
+        follow-up · prompt tab
       </div>
-      <div className="text-[13px] text-warm-fog">
-        This tab's content lands in a follow-up spec. Overview is live — metrics,
-        charts, and run history for {name}.
+      <div className="text-[13px] text-warm-fog mb-[4px]">
+        The Prompt tab will show the system prompt for each version of{" "}
+        <code className="font-mono text-aether-teal">{name}</code> and diff
+        across versions.
+      </div>
+      <div className="text-[11px] text-patina leading-[1.5]">
+        Lands once the SDK captures system prompts as a distinct resource
+        attribute (not buried inside each LLM span&apos;s message history).
       </div>
     </div>
   );
@@ -198,9 +206,11 @@ export default async function AgentTab({
     notFound();
   }
 
+  // Fetch only what each tab needs.
   let metrics: AgentMetrics | null = null;
   let tools: AgentToolUsage[] = [];
   let runs: AgentRunsResponse | null = null;
+
   if (tab === "overview") {
     try {
       const [m, t, r] = await Promise.all([
@@ -214,6 +224,28 @@ export default async function AgentTab({
     } catch {
       // leave nulls; page renders empty states
     }
+  } else if (tab === "runs") {
+    try {
+      const [m, r] = await Promise.all([
+        getAgentMetrics(name, window),
+        getAgentRuns(name, { limit: 100 }),
+      ]);
+      metrics = m;
+      runs = r;
+    } catch {}
+  } else if (tab === "tools") {
+    try {
+      const [m, t] = await Promise.all([
+        getAgentMetrics(name, window),
+        getAgentTools(name, window),
+      ]);
+      metrics = m;
+      tools = t;
+    } catch {}
+  } else if (tab === "versions" || tab === "config" || tab === "prompt") {
+    try {
+      metrics = await getAgentMetrics(name, window);
+    } catch {}
   }
 
   const breadcrumb = (
@@ -297,9 +329,7 @@ export default async function AgentTab({
         })}
       </div>
 
-      {tab !== "overview" ? (
-        <PlaceholderTab name={name} tab={tab} />
-      ) : (
+      {tab === "overview" ? (
         <>
           <div className="grid grid-cols-5 gap-[8px] mb-[10px]">
             <KpiTile
@@ -371,6 +401,42 @@ export default async function AgentTab({
             />
           </div>
         </>
+      ) : tab === "runs" ? (
+        <Card
+          title={`All runs · ${window}`}
+          right={
+            runs
+              ? `${runs.total.toLocaleString()} total · showing ${runs.items.length}`
+              : undefined
+          }
+          className="!p-0"
+        >
+          <RunsTable rows={runs?.items ?? []} />
+        </Card>
+      ) : tab === "tools" ? (
+        <Card
+          title={`Tool usage · ${window}`}
+          right={
+            tools.length
+              ? `${tools.length} tool${tools.length === 1 ? "" : "s"}`
+              : undefined
+          }
+          className="!p-0"
+        >
+          <ToolsTable tools={tools} />
+        </Card>
+      ) : tab === "versions" ? (
+        <Card
+          title={`Versions · ${agent.versions.length}`}
+          right="first-seen → last-seen"
+          className="!p-0"
+        >
+          <VersionsTimeline versions={agent.versions} />
+        </Card>
+      ) : tab === "config" ? (
+        <ConfigForm agent={agent} />
+      ) : (
+        <PromptPlaceholder name={name} />
       )}
     </AppShell>
   );
