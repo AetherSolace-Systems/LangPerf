@@ -212,3 +212,16 @@ class OverviewResponse(BaseModel):
     top_tools: list[TopTool]
     recent_flagged: list[FlaggedRun]
     heatmap: list[HeatmapCell]
+
+
+class AgentMiniMetrics(BaseModel):
+    runs: int
+    error_rate: float
+    p95_latency_ms: Optional[int]
+
+
+class AgentSummaryWithMetrics(AgentSummary):
+    metrics: AgentMiniMetrics
+    sparkline: list[int] = []
+    version_count: int = 0
+    environments: list[str] = []

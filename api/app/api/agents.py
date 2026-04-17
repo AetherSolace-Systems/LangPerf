@@ -15,11 +15,13 @@ from app.db import get_session
 from app.models import Agent, AgentVersion, Span, Trajectory
 from app.schemas import (
     AgentDetail,
+    AgentMiniMetrics,
     AgentMetrics,
     AgentPatch,
     AgentRunRow,
     AgentRunsResponse,
     AgentSummary,
+    AgentSummaryWithMetrics,
     AgentToolUsage,
 )
 
@@ -28,16 +30,135 @@ router = APIRouter(prefix="/api/agents")
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 
 
-@router.get("", response_model=list[AgentSummary])
+@router.get(
+    "",
+    response_model=list[AgentSummary] | list[AgentSummaryWithMetrics],
+)
 async def list_agents(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
+    with_metrics: bool = Query(default=False),
+    window: str = Query(default="7d", pattern="^(24h|7d|30d)$"),
     session: AsyncSession = Depends(get_session),
-) -> list[AgentSummary]:
+):
     result = await session.execute(
         select(Agent).order_by(Agent.name).limit(limit).offset(offset)
     )
-    return [AgentSummary.model_validate(a) for a in result.scalars().all()]
+    agents = list(result.scalars().all())
+
+    if not with_metrics:
+        return [AgentSummary.model_validate(a) for a in agents]
+
+    since = datetime.now(tz=timezone.utc) - _WINDOW_DELTA[window]
+
+    runs_by_agent = {
+        row.agent_id: int(row.n)
+        for row in (
+            await session.execute(
+                select(Trajectory.agent_id, func.count().label("n"))
+                .where(
+                    Trajectory.agent_id.is_not(None),
+                    Trajectory.started_at >= since,
+                )
+                .group_by(Trajectory.agent_id)
+            )
+        ).all()
+    }
+
+    errors_by_agent = {
+        row.agent_id: int(row.n)
+        for row in (
+            await session.execute(
+                select(Trajectory.agent_id, func.count().label("n"))
+                .where(
+                    Trajectory.agent_id.is_not(None),
+                    Trajectory.started_at >= since,
+                    Trajectory.status_tag == "bad",
+                )
+                .group_by(Trajectory.agent_id)
+            )
+        ).all()
+    }
+
+    p95_by_agent = {
+        row.agent_id: int(row.p95) if row.p95 is not None else None
+        for row in (
+            await session.execute(
+                select(
+                    Trajectory.agent_id,
+                    func.percentile_cont(0.95)
+                    .within_group(Trajectory.duration_ms.asc())
+                    .label("p95"),
+                )
+                .where(
+                    Trajectory.agent_id.is_not(None),
+                    Trajectory.started_at >= since,
+                    Trajectory.duration_ms.is_not(None),
+                )
+                .group_by(Trajectory.agent_id)
+            )
+        ).all()
+    }
+
+    day_bucket = func.date_trunc("day", Trajectory.started_at).label("day")
+    spark_rows = (
+        await session.execute(
+            select(Trajectory.agent_id, day_bucket, func.count().label("n"))
+            .where(
+                Trajectory.agent_id.is_not(None),
+                Trajectory.started_at >= since,
+            )
+            .group_by(Trajectory.agent_id, "day")
+            .order_by(Trajectory.agent_id, "day")
+        )
+    ).all()
+    spark_by_agent: dict[str, list[int]] = {}
+    for agent_id, _day, n in spark_rows:
+        spark_by_agent.setdefault(agent_id, []).append(int(n))
+
+    version_count_by_agent = {
+        row.agent_id: int(row.n)
+        for row in (
+            await session.execute(
+                select(AgentVersion.agent_id, func.count().label("n"))
+                .group_by(AgentVersion.agent_id)
+            )
+        ).all()
+    }
+
+    envs_by_agent: dict[str, list[str]] = {}
+    env_rows = (
+        await session.execute(
+            select(Trajectory.agent_id, Trajectory.environment)
+            .where(
+                Trajectory.agent_id.is_not(None),
+                Trajectory.started_at >= since,
+                Trajectory.environment.is_not(None),
+            )
+            .distinct()
+        )
+    ).all()
+    for agent_id, env in env_rows:
+        envs_by_agent.setdefault(agent_id, []).append(env)
+
+    out: list[AgentSummaryWithMetrics] = []
+    for a in agents:
+        runs = runs_by_agent.get(a.id, 0)
+        errors = errors_by_agent.get(a.id, 0)
+        out.append(
+            AgentSummaryWithMetrics(
+                **AgentSummary.model_validate(a).model_dump(),
+                metrics=AgentMiniMetrics(
+                    runs=runs,
+                    error_rate=(errors / runs) if runs else 0.0,
+                    p95_latency_ms=p95_by_agent.get(a.id),
+                ),
+                sparkline=spark_by_agent.get(a.id, []),
+                version_count=version_count_by_agent.get(a.id, 0),
+                environments=sorted(envs_by_agent.get(a.id, [])),
+            )
+        )
+    return out
 
 
 @router.get("/{name}", response_model=AgentDetail)
