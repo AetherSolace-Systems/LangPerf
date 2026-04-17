@@ -1,13 +1,15 @@
 "use client";
 
-import type { Span } from "@/lib/api";
 import { kindOf } from "@/lib/span-fields";
 import { GenericSpanView } from "@/components/views/generic-span-view";
 import { LlmSpanView } from "@/components/views/llm-span-view";
 import { NotesEditor } from "@/components/notes-editor";
+import { useSelection } from "@/components/selection-context";
 import { ToolSpanView } from "@/components/views/tool-span-view";
 
-export function NodeDetailPanel({ span }: { span: Span | null }) {
+export function NodeDetailPanel() {
+  const { selectedSpan: span } = useSelection();
+
   if (!span) {
     return (
       <div className="p-6 text-sm text-[var(--muted)]">

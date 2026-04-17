@@ -14,6 +14,7 @@ import {
 
 import type { Span } from "@/lib/api";
 import { DRIFT, KIND_GLYPH, KIND_LABEL, kindSwatch } from "@/lib/colors";
+import { useSelection } from "@/components/selection-context";
 import { fmtDuration, fmtTokens } from "@/lib/format";
 import { buildSequenceLayout, type LayoutNode } from "@/lib/sequence-layout";
 import { extractTotalTokens } from "@/lib/span-fields";
@@ -156,15 +157,8 @@ const nodeTypes = {
   frame: FrameNodeComp,
 };
 
-export function TrajectoryGraph({
-  spans,
-  selectedId,
-  onSelect,
-}: {
-  spans: Span[];
-  selectedId: string | null;
-  onSelect: (span: Span) => void;
-}) {
+export function TrajectoryGraph({ spans }: { spans: Span[] }) {
+  const { selectedId, select } = useSelection();
   const { rfNodes } = useMemo(() => {
     const { all } = buildSequenceLayout(spans);
     const nodes: Node[] = all.map((ln) => ({
@@ -210,7 +204,7 @@ export function TrajectoryGraph({
         proOptions={{ hideAttribution: true }}
         onNodeClick={(_, n) => {
           const layout = (n.data as StepData | FrameData).layout;
-          if (layout.span) onSelect(layout.span);
+          if (layout.span) select(layout.span);
         }}
         nodesDraggable={false}
         nodesConnectable={false}

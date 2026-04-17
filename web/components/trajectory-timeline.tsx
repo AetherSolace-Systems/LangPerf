@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { Span } from "@/lib/api";
 import { DRIFT, kindSwatch } from "@/lib/colors";
+import { useSelection } from "@/components/selection-context";
 import { fmtDuration } from "@/lib/format";
 import { kindOf } from "@/lib/span-fields";
 import {
@@ -34,15 +35,8 @@ const LABEL_WIDTH = 240;
 const DEFAULT_PX_PER_MS_MIN = 0.01;
 const DEFAULT_PX_PER_MS_MAX = 1000;
 
-export function TrajectoryTimeline({
-  spans,
-  selectedId,
-  onSelect,
-}: {
-  spans: Span[];
-  selectedId: string | null;
-  onSelect: (span: Span) => void;
-}) {
+export function TrajectoryTimeline({ spans }: { spans: Span[] }) {
+  const { selectedId, select } = useSelection();
   const { rows, trajectoryStartMs, trajectoryEndMs, totalMs } = useMemo(() => {
     if (spans.length === 0) {
       return {
@@ -224,7 +218,7 @@ export function TrajectoryTimeline({
               key={r.span.span_id}
               row={r}
               selected={r.span.span_id === selectedId}
-              onSelect={onSelect}
+              onSelect={select}
               pxPerMs={effectivePxPerMs}
               trackWidth={trackWidth}
             />

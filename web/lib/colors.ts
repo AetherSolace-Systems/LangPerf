@@ -3,6 +3,16 @@
  *
  * All kind/role/tag coloring lives here so tree, graph, timeline, and
  * right-panel agree. Change a color here and it propagates across views.
+ *
+ * Convention (read before adding colors):
+ *   - Kind-aware colors (LLM/tool/agent/reasoning/trajectory node borders,
+ *     tag chips, role-coded message cards) MUST come from kindSwatch() /
+ *     roleSwatch() / tagSwatch() or the DRIFT palette below. Don't hardcode
+ *     hexes or one-off Tailwind color classes — it breaks cross-view sync.
+ *   - Structural colors (page backgrounds, panel borders, muted helper
+ *     text, scrollbars) stay on CSS variables (`var(--border)`,
+ *     `var(--muted)`, `var(--foreground)`) so a single theme swap can move
+ *     the whole app in lockstep with tailwind.config.ts and globals.css.
  */
 
 export const DRIFT = {

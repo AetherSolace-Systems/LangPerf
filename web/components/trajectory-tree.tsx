@@ -3,47 +3,26 @@
 import { useMemo, useState } from "react";
 import type { Span } from "@/lib/api";
 import { kindSwatch } from "@/lib/colors";
+import { useSelection } from "@/components/selection-context";
 import { fmtDuration, fmtTokens } from "@/lib/format";
 import { extractTotalTokens, kindOf } from "@/lib/span-fields";
 import { buildTree, type TreeNode } from "@/lib/tree";
 
-export function TrajectoryTree({
-  spans,
-  selectedId,
-  onSelect,
-}: {
-  spans: Span[];
-  selectedId: string | null;
-  onSelect: (span: Span) => void;
-}) {
+export function TrajectoryTree({ spans }: { spans: Span[] }) {
   const roots = useMemo(() => buildTree(spans), [spans]);
   return (
     <div className="text-sm font-mono">
       {roots.length === 0 ? (
         <div className="p-5 text-twilight">No spans.</div>
       ) : (
-        roots.map((r) => (
-          <TreeRow
-            key={r.span.span_id}
-            node={r}
-            selectedId={selectedId}
-            onSelect={onSelect}
-          />
-        ))
+        roots.map((r) => <TreeRow key={r.span.span_id} node={r} />)
       )}
     </div>
   );
 }
 
-function TreeRow({
-  node,
-  selectedId,
-  onSelect,
-}: {
-  node: TreeNode;
-  selectedId: string | null;
-  onSelect: (span: Span) => void;
-}) {
+function TreeRow({ node }: { node: TreeNode }) {
+  const { selectedId, select } = useSelection();
   const [open, setOpen] = useState(true);
   const hasChildren = node.children.length > 0;
   const kind = kindOf(node.span);
@@ -57,11 +36,11 @@ function TreeRow({
       <div
         role="button"
         tabIndex={0}
-        onClick={() => onSelect(node.span)}
+        onClick={() => select(node.span)}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            onSelect(node.span);
+            select(node.span);
           }
         }}
         className={`group flex items-center gap-2 px-3 py-1.5 border-b border-[color:var(--border)]/50 cursor-pointer hover:bg-linen/[0.04] transition-colors ${
@@ -105,12 +84,7 @@ function TreeRow({
       {open && hasChildren ? (
         <div>
           {node.children.map((c) => (
-            <TreeRow
-              key={c.span.span_id}
-              node={c}
-              selectedId={selectedId}
-              onSelect={onSelect}
-            />
+            <TreeRow key={c.span.span_id} node={c} />
           ))}
         </div>
       ) : null}
