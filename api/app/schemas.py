@@ -154,3 +154,61 @@ class AgentRunsResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+# ── Overview (dashboard) ────────────────────────────────────────────────
+
+
+class OverviewKpi(BaseModel):
+    runs: int
+    agents: int
+    error_rate: float
+    p50_latency_ms: Optional[int]
+    p95_latency_ms: Optional[int]
+    p99_latency_ms: Optional[int]
+    flagged: int
+    total_tokens: int
+
+
+class VolumeDay(BaseModel):
+    day: datetime
+    prod: int
+    staging: int
+    dev: int
+    other: int
+
+
+class EnvSplit(BaseModel):
+    environment: str
+    runs: int
+
+
+class TopTool(BaseModel):
+    tool: str
+    calls: int
+    errors: int
+
+
+class FlaggedRun(BaseModel):
+    id: str
+    started_at: datetime
+    duration_ms: Optional[int]
+    status_tag: Optional[str]
+    agent_name: Optional[str]
+    summary: Optional[str]
+
+
+class HeatmapCell(BaseModel):
+    agent_name: str
+    tool: str
+    calls: int
+
+
+class OverviewResponse(BaseModel):
+    window: str
+    kpi: OverviewKpi
+    volume_by_day: list[VolumeDay]
+    env_split: list[EnvSplit]
+    top_tools: list[TopTool]
+    recent_flagged: list[FlaggedRun]
+    heatmap: list[HeatmapCell]
