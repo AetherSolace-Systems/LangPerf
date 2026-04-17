@@ -116,3 +116,41 @@ class AgentPatch(BaseModel):
     owner: Optional[str] = None
     github_url: Optional[str] = None
     rename_to: Optional[str] = None
+
+
+class AgentToolUsage(BaseModel):
+    tool: str
+    calls: int
+    errors: int
+
+
+class AgentMetrics(BaseModel):
+    agent: str
+    window: str  # "24h" | "7d" | "30d"
+    runs: int
+    errors: int
+    error_rate: float
+    p50_latency_ms: Optional[int]
+    p95_latency_ms: Optional[int]
+    p99_latency_ms: Optional[int]
+    total_tokens: int
+
+
+class AgentRunRow(BaseModel):
+    id: str
+    started_at: datetime
+    ended_at: Optional[datetime]
+    duration_ms: Optional[int]
+    step_count: int
+    token_count: int
+    status_tag: Optional[str]
+    name: Optional[str]
+    environment: Optional[str]
+    version_label: Optional[str]
+
+
+class AgentRunsResponse(BaseModel):
+    items: list[AgentRunRow]
+    total: int
+    limit: int
+    offset: int
