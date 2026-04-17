@@ -1,6 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { Span } from "@/lib/api";
 import { DRIFT, kindSwatch } from "@/lib/colors";
 import { fmtDuration } from "@/lib/format";
@@ -11,11 +17,15 @@ type Row = {
   span: Span;
   kind: string;
   depth: number;
-  startMs: number;
-  endMs: number;
-  leftPct: number;
-  widthPct: number;
+  startMs: number; // absolute wall-clock ms
+  endMs: number; // absolute wall-clock ms
+  offsetMs: number; // ms from trajectory start
+  durationMs: number;
 };
+
+const LABEL_WIDTH = 240;
+const DEFAULT_PX_PER_MS_MIN = 0.01;
+const DEFAULT_PX_PER_MS_MAX = 1000;
 
 export function TrajectoryTimeline({
   spans,
@@ -26,11 +36,15 @@ export function TrajectoryTimeline({
   selectedId: string | null;
   onSelect: (span: Span) => void;
 }) {
-  const { rows, totalMs, ticks, trajectoryStartMs } = useMemo(() => {
+  const { rows, trajectoryStartMs, trajectoryEndMs, totalMs } = useMemo(() => {
     if (spans.length === 0) {
-      return { rows: [] as Row[], totalMs: 0, ticks: [] as number[], trajectoryStartMs: 0 };
+      return {
+        rows: [] as Row[],
+        trajectoryStartMs: 0,
+        trajectoryEndMs: 0,
+        totalMs: 0,
+      };
     }
-
     const toMs = (iso: string) => new Date(iso).getTime();
     const allStart = Math.min(...spans.map((s) => toMs(s.started_at)));
     const allEnd = Math.max(
@@ -47,111 +61,223 @@ export function TrajectoryTimeline({
       const endMs = n.span.ended_at
         ? toMs(n.span.ended_at)
         : startMs + (n.span.duration_ms ?? 0);
-      const leftPct = ((startMs - allStart) / total) * 100;
-      const widthPct = Math.max(0.4, ((endMs - startMs) / total) * 100);
       flat.push({
         span: n.span,
         kind: kindOf(n.span),
         depth: n.depth,
         startMs,
         endMs,
-        leftPct,
-        widthPct,
+        offsetMs: startMs - allStart,
+        durationMs: Math.max(0, endMs - startMs),
       });
       for (const c of n.children) walk(c);
     };
     for (const r of roots) walk(r);
 
-    // Choose a sensible number of tick marks (4-6) based on duration.
-    const tickCount = 5;
-    const tickValues = Array.from({ length: tickCount + 1 }, (_, i) =>
-      Math.round((total * i) / tickCount),
-    );
-
     return {
       rows: flat,
-      totalMs: total,
-      ticks: tickValues,
       trajectoryStartMs: allStart,
+      trajectoryEndMs: allEnd,
+      totalMs: total,
     };
   }, [spans]);
+
+  // Scroll container → we measure its width to drive "fit" zoom.
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(800);
+  const [pxPerMs, setPxPerMs] = useState<number | null>(null);
+
+  // Observe scroll container size so "fit" works after layout.
+  useLayoutEffect(() => {
+    if (!scrollRef.current) return;
+    const measure = () => {
+      if (!scrollRef.current) return;
+      const w = Math.max(
+        300,
+        scrollRef.current.clientWidth - LABEL_WIDTH - 24,
+      );
+      setContainerWidth(w);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(scrollRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  // Default to fit-width when totalMs or container first becomes known.
+  useEffect(() => {
+    if (totalMs > 0 && pxPerMs === null) {
+      setPxPerMs(containerWidth / totalMs);
+    }
+  }, [totalMs, containerWidth, pxPerMs]);
+
+  const effectivePxPerMs = pxPerMs ?? Math.max(1, containerWidth / Math.max(1, totalMs));
+  const trackWidth = Math.max(containerWidth, totalMs * effectivePxPerMs);
+
+  const { tickIntervalMs, ticks } = useMemo(
+    () => buildTicks(totalMs, effectivePxPerMs),
+    [totalMs, effectivePxPerMs],
+  );
 
   if (spans.length === 0) {
     return <div className="p-6 text-sm text-twilight">No spans to plot.</div>;
   }
 
+  const zoomIn = () =>
+    setPxPerMs((p) =>
+      Math.min(
+        DEFAULT_PX_PER_MS_MAX,
+        (p ?? containerWidth / Math.max(1, totalMs)) * 1.6,
+      ),
+    );
+  const zoomOut = () =>
+    setPxPerMs((p) =>
+      Math.max(
+        DEFAULT_PX_PER_MS_MIN,
+        (p ?? containerWidth / Math.max(1, totalMs)) / 1.6,
+      ),
+    );
+  const fit = () => setPxPerMs(containerWidth / Math.max(1, totalMs));
+
   return (
-    <div className="h-full flex flex-col font-mono text-xs">
-      <TimeAxis ticks={ticks} totalMs={totalMs} />
-      <div className="flex-1 overflow-y-auto">
-        {rows.map((r) => (
-          <TimelineRow
-            key={r.span.span_id}
-            row={r}
-            selected={r.span.span_id === selectedId}
-            onSelect={onSelect}
-          />
-        ))}
+    <div className="relative h-full">
+      <ZoomControls
+        onZoomIn={zoomIn}
+        onZoomOut={zoomOut}
+        onFit={fit}
+        pxPerMs={effectivePxPerMs}
+      />
+      <div className="absolute top-2 left-4 z-30 text-[10px] font-mono text-twilight pointer-events-none">
+        <span className="text-linen/80">
+          {fmtDate(trajectoryStartMs)}
+        </span>
+        <span className="ml-2">
+          {fmtWallTime(trajectoryStartMs, { ms: true })} →{" "}
+          {fmtWallTime(trajectoryEndMs, { ms: true })}
+        </span>
+        <span className="ml-2">({fmtDuration(totalMs)})</span>
       </div>
-    </div>
-  );
-}
 
-const LABEL_WIDTH = 240;
-
-function TimeAxis({ ticks, totalMs }: { ticks: number[]; totalMs: number }) {
-  return (
-    <div className="flex-shrink-0 flex border-b border-[color:var(--border)]">
       <div
-        className="flex-shrink-0 px-3 py-1.5 text-[10px] text-twilight"
-        style={{ width: LABEL_WIDTH }}
+        ref={scrollRef}
+        className="h-full overflow-auto font-mono text-xs"
       >
-        &nbsp;
-      </div>
-      <div className="relative flex-1 h-6">
-        {ticks.map((t, i) => {
-          const pct = (t / Math.max(1, totalMs)) * 100;
-          return (
-            <div
-              key={i}
-              className="absolute top-0 bottom-0 flex flex-col items-start"
-              style={{
-                left: `${pct}%`,
-                transform: i === ticks.length - 1 ? "translateX(-100%)" : i === 0 ? "translateX(0)" : "translateX(-50%)",
-              }}
-            >
-              <div className="w-px h-1.5 bg-[color:var(--border-strong)]" />
-              <span className="text-[10px] text-twilight tabular-nums mt-0.5 px-0.5">
-                {fmtTickLabel(t)}
-              </span>
-            </div>
-          );
-        })}
+        {/* Axis row — sticky to top so it stays visible while scrolling rows. */}
+        <div
+          className="flex sticky top-0 z-20 bg-midnight border-b border-[color:var(--border)]"
+          style={{ minWidth: LABEL_WIDTH + trackWidth }}
+        >
+          <div
+            className="flex-shrink-0 sticky left-0 z-10 bg-midnight"
+            style={{ width: LABEL_WIDTH, height: 32 }}
+          />
+          <div
+            className="relative"
+            style={{ width: trackWidth, height: 32 }}
+          >
+            {ticks.map((tickMs, i) => {
+              const leftPx = tickMs * effectivePxPerMs;
+              const absMs = trajectoryStartMs + tickMs;
+              const anchor =
+                i === 0
+                  ? "translateX(0)"
+                  : i === ticks.length - 1
+                    ? "translateX(-100%)"
+                    : "translateX(-50%)";
+              return (
+                <div
+                  key={i}
+                  className="absolute top-0 bottom-0 flex flex-col items-start"
+                  style={{ left: leftPx, transform: anchor }}
+                >
+                  <div className="w-px h-2 bg-[color:var(--border-strong)]" />
+                  <span className="text-[10px] text-twilight tabular-nums mt-0.5 px-1 whitespace-nowrap">
+                    {fmtTickTime(absMs, tickIntervalMs)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Rows */}
+        <div style={{ minWidth: LABEL_WIDTH + trackWidth }}>
+          {rows.map((r) => (
+            <TimelineRow
+              key={r.span.span_id}
+              row={r}
+              selected={r.span.span_id === selectedId}
+              onSelect={onSelect}
+              pxPerMs={effectivePxPerMs}
+              trackWidth={trackWidth}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-function fmtTickLabel(ms: number): string {
-  if (ms === 0) return "0s";
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60_000) return `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)}s`;
-  const mins = Math.floor(ms / 60_000);
-  const secs = Math.round((ms % 60_000) / 1000);
-  return secs ? `${mins}m${secs}s` : `${mins}m`;
+function ZoomControls({
+  onZoomIn,
+  onZoomOut,
+  onFit,
+  pxPerMs,
+}: {
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onFit: () => void;
+  pxPerMs: number;
+}) {
+  return (
+    <div className="absolute top-1.5 right-3 z-30 flex items-center gap-1 bg-deep-indigo/80 backdrop-blur border border-[color:var(--border)] rounded px-1.5 py-0.5">
+      <button
+        type="button"
+        onClick={onZoomOut}
+        className="px-1.5 text-linen/80 hover:text-marigold text-sm leading-none"
+        aria-label="zoom out"
+      >
+        −
+      </button>
+      <button
+        type="button"
+        onClick={onFit}
+        className="px-1.5 text-[10px] text-twilight hover:text-linen uppercase tracking-wider"
+      >
+        fit
+      </button>
+      <button
+        type="button"
+        onClick={onZoomIn}
+        className="px-1.5 text-linen/80 hover:text-marigold text-sm leading-none"
+        aria-label="zoom in"
+      >
+        +
+      </button>
+      <span className="text-[9px] text-twilight tabular-nums ml-1 border-l border-[color:var(--border)] pl-1.5">
+        {fmtScale(pxPerMs)}
+      </span>
+    </div>
+  );
 }
 
 function TimelineRow({
   row,
   selected,
   onSelect,
+  pxPerMs,
+  trackWidth,
 }: {
   row: Row;
   selected: boolean;
   onSelect: (span: Span) => void;
+  pxPerMs: number;
+  trackWidth: number;
 }) {
   const swatch = kindSwatch(row.kind);
   const isError = row.span.status_code === "ERROR";
+  const leftPx = row.offsetMs * pxPerMs;
+  const widthPx = Math.max(3, row.durationMs * pxPerMs);
 
   return (
     <div
@@ -169,7 +295,7 @@ function TimelineRow({
       }`}
     >
       <div
-        className="flex-shrink-0 flex items-center gap-2 px-3 py-1.5"
+        className="flex-shrink-0 sticky left-0 z-10 bg-midnight flex items-center gap-2 px-3 py-1.5"
         style={{ width: LABEL_WIDTH, paddingLeft: `${row.depth * 12 + 12}px` }}
       >
         <span
@@ -180,17 +306,20 @@ function TimelineRow({
         </span>
         <span className="flex-1 truncate text-linen">{row.span.name}</span>
       </div>
-      <div className="relative flex-1 h-7">
+      <div
+        className="relative h-7 flex-shrink-0"
+        style={{ width: trackWidth }}
+      >
         <div
           className="absolute top-1.5 bottom-1.5 rounded-sm transition-all"
           style={{
-            left: `${row.leftPct}%`,
-            width: `${row.widthPct}%`,
+            left: leftPx,
+            width: widthPx,
             background: swatch.bg,
             border: `1px solid ${selected ? DRIFT.marigold : swatch.border}`,
             boxShadow: selected ? `0 0 0 1px ${DRIFT.marigold}66` : undefined,
           }}
-          title={`${row.span.name} · ${fmtDuration(row.span.duration_ms)}`}
+          title={`${row.span.name} · ${fmtDuration(row.durationMs)}`}
         >
           <div
             className="absolute inset-y-0 left-0 w-0.5"
@@ -200,7 +329,7 @@ function TimelineRow({
         {isError ? (
           <div
             className="absolute top-1.5 bottom-1.5 flex items-center pl-1"
-            style={{ left: `${row.leftPct + row.widthPct}%` }}
+            style={{ left: leftPx + widthPx }}
           >
             <span className="text-coral">!</span>
           </div>
@@ -208,4 +337,76 @@ function TimelineRow({
       </div>
     </div>
   );
+}
+
+function buildTicks(
+  totalMs: number,
+  pxPerMs: number,
+): { tickIntervalMs: number; ticks: number[] } {
+  if (totalMs <= 0) return { tickIntervalMs: 1000, ticks: [0] };
+  // Aim for a tick every ~110px
+  const desiredPx = 110;
+  const desiredMs = desiredPx / Math.max(0.0001, pxPerMs);
+  const candidates = [
+    1, 2, 5, 10, 25, 50, 100, 250, 500, 1000, 2000, 5000, 10_000, 15_000,
+    30_000, 60_000, 120_000, 300_000, 600_000,
+  ];
+  const interval = candidates.find((c) => c >= desiredMs) ?? candidates[candidates.length - 1];
+  const count = Math.max(1, Math.ceil(totalMs / interval));
+  const ticks: number[] = [];
+  for (let i = 0; i <= count; i++) {
+    const t = i * interval;
+    if (t <= totalMs) ticks.push(t);
+  }
+  if (ticks[ticks.length - 1] !== totalMs) ticks.push(totalMs);
+  return { tickIntervalMs: interval, ticks };
+}
+
+function fmtWallTime(
+  absMs: number,
+  { ms = false }: { ms?: boolean } = {},
+): string {
+  const d = new Date(absMs);
+  const h = String(d.getHours()).padStart(2, "0");
+  const m = String(d.getMinutes()).padStart(2, "0");
+  const s = String(d.getSeconds()).padStart(2, "0");
+  if (!ms) return `${h}:${m}:${s}`;
+  const millis = String(d.getMilliseconds()).padStart(3, "0");
+  return `${h}:${m}:${s}.${millis}`;
+}
+
+function fmtTickTime(absMs: number, tickIntervalMs: number): string {
+  if (tickIntervalMs >= 1000) return fmtWallTime(absMs);
+  if (tickIntervalMs >= 100) {
+    const d = new Date(absMs);
+    const s = String(d.getSeconds()).padStart(2, "0");
+    const ms = String(d.getMilliseconds()).padStart(3, "0");
+    return `:${s}.${ms.slice(0, 1)}`;
+  }
+  if (tickIntervalMs >= 10) {
+    const d = new Date(absMs);
+    const s = String(d.getSeconds()).padStart(2, "0");
+    const ms = String(d.getMilliseconds()).padStart(3, "0");
+    return `:${s}.${ms.slice(0, 2)}`;
+  }
+  const d = new Date(absMs);
+  const s = String(d.getSeconds()).padStart(2, "0");
+  const ms = String(d.getMilliseconds()).padStart(3, "0");
+  return `:${s}.${ms}`;
+}
+
+function fmtDate(absMs: number): string {
+  return new Date(absMs).toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function fmtScale(pxPerMs: number): string {
+  if (pxPerMs >= 1) return `${pxPerMs.toFixed(pxPerMs >= 10 ? 0 : 1)}px/ms`;
+  const pxPerSec = pxPerMs * 1000;
+  if (pxPerSec >= 1) return `${pxPerSec.toFixed(pxPerSec >= 10 ? 0 : 1)}px/s`;
+  const pxPerMin = pxPerSec * 60;
+  return `${pxPerMin.toFixed(pxPerMin >= 10 ? 0 : 1)}px/min`;
 }

@@ -49,6 +49,25 @@ def _jump_between_trajectories() -> None:
     _advance_ms(random.uniform(3 * 60 * 1000, 120 * 60 * 1000))
 
 
+def parallel_branches(branches: list) -> None:
+    """Run each branch as if concurrent: each starts at the same simulated
+    time, and the cursor is advanced to the latest branch end when all finish.
+
+    Each entry in `branches` is a callable that emits spans (leaves, agents,
+    llms, tools, etc). The shared cursor is rewound to the pre-block value
+    before each branch runs, so they all have overlapping start times — the
+    shape real parallel agent dispatch produces on a timeline.
+    """
+    global _cursor_ns
+    start = _cursor_ns
+    ends: list[int] = []
+    for branch in branches:
+        _cursor_ns = start
+        branch()
+        ends.append(_cursor_ns)
+    _cursor_ns = max(ends) if ends else start
+
+
 # --------------------------------------------------------------------------- #
 # Span primitives                                                              #
 # --------------------------------------------------------------------------- #
@@ -683,6 +702,225 @@ def traj_deep_reasoning() -> None:
         )
 
 
+def traj_parallel_research() -> None:
+    """Supervisor launches 3 sub-agents in parallel, waits for all, synthesizes.
+
+    The three sub-agents finish at very different times (1.5s, 2s, 3.5s) so
+    their overlap pattern is visible on the timeline. On the graph, all three
+    agents appear as dispatched by the supervisor with aggregated edges.
+    """
+    def climate_agent() -> None:
+        with fake_agent("climate_data_agent", "fetches and summarizes climate data"):
+            fake_llm(
+                name="climate.plan",
+                system="You research climate data.",
+                user="Gather NOAA temperature anomalies and IPCC projections for 2020-2025.",
+                response="Fetching NOAA then IPCC.",
+                model="gpt-4o",
+                prompt_tok=180,
+                completion_tok=20,
+                duration_ms=220,
+                tool_calls=[
+                    {"name": "fetch_noaa_data", "args": {"years": [2020, 2025]}, "id": "c1"},
+                    {"name": "fetch_ipcc_report", "args": {"report": "AR6 WG1"}, "id": "c2"},
+                ],
+            )
+            fake_tool(
+                name="fetch_noaa_data",
+                args={"years": [2020, 2025]},
+                result={
+                    "anomaly_c": [1.14, 1.22, 1.31, 1.45, 1.48, 1.52],
+                    "unit": "°C above 1850-1900 baseline",
+                },
+                duration_ms=640,
+            )
+            fake_tool(
+                name="fetch_ipcc_report",
+                args={"report": "AR6 WG1"},
+                result={
+                    "sections": ["SPM", "Ch3", "Ch4", "Ch7"],
+                    "key_projections": "1.5°C warming likely by early 2030s under all scenarios.",
+                },
+                duration_ms=810,
+            )
+            fake_llm(
+                name="climate.summarize",
+                system="Summarize climate findings.",
+                user="Given the NOAA + IPCC data, summarize trend.",
+                response=(
+                    "Global temperature anomaly has risen steadily from 1.14°C (2020) to "
+                    "1.52°C (2025) above pre-industrial baseline. IPCC AR6 projects 1.5°C "
+                    "threshold likely crossed in early 2030s across all emissions scenarios."
+                ),
+                model="gpt-4o",
+                prompt_tok=360,
+                completion_tok=85,
+                duration_ms=420,
+            )
+
+    def economic_agent() -> None:
+        with fake_agent("economic_analysis_agent", "queries economic impact data"):
+            fake_llm(
+                name="economic.plan",
+                system="You analyze economic impact of climate change.",
+                user="Look up World Bank estimates for climate GDP impact.",
+                response="Querying World Bank climate indicators.",
+                model="claude-sonnet-4-6",
+                prompt_tok=200,
+                completion_tok=22,
+                duration_ms=310,
+                tool_calls=[
+                    {
+                        "name": "query_world_bank",
+                        "args": {"indicator": "climate_gdp_impact", "region": "global"},
+                        "id": "e1",
+                    }
+                ],
+            )
+            fake_tool(
+                name="query_world_bank",
+                args={"indicator": "climate_gdp_impact", "region": "global"},
+                result={
+                    "baseline_gdp_2050": 230e12,
+                    "climate_drag_pct_low": 4.2,
+                    "climate_drag_pct_high": 18.0,
+                    "note": "Range depends on warming trajectory (1.5°C vs 3°C scenarios).",
+                },
+                duration_ms=520,
+            )
+            fake_llm(
+                name="economic.analyze",
+                system="Analyze economic impact.",
+                user="Translate World Bank figures into a narrative.",
+                response=(
+                    "At a 1.5°C trajectory, global GDP in 2050 drags 4.2% below baseline "
+                    "(≈ $9.7T). At 3°C, drag widens to 18% (≈ $41.4T). Largest losses in "
+                    "agriculture and low-lying coastal regions."
+                ),
+                model="claude-sonnet-4-6",
+                prompt_tok=410,
+                completion_tok=95,
+                duration_ms=680,
+            )
+
+    def social_agent() -> None:
+        with fake_agent("social_impact_agent", "analyzes displacement + migration data"):
+            fake_llm(
+                name="social.plan",
+                system="You analyze climate's social impact.",
+                user="Gather news + survey data on climate migration.",
+                response="Scraping news + pulling UNHCR survey data.",
+                model="gpt-4o-mini",
+                prompt_tok=170,
+                completion_tok=18,
+                duration_ms=195,
+                tool_calls=[
+                    {
+                        "name": "scrape_news",
+                        "args": {"query": "climate migration 2024-2025", "n": 50},
+                        "id": "s1",
+                    },
+                    {
+                        "name": "fetch_survey_data",
+                        "args": {"source": "UNHCR", "topic": "climate_displacement"},
+                        "id": "s2",
+                    },
+                ],
+            )
+            fake_tool(
+                name="scrape_news",
+                args={"query": "climate migration 2024-2025", "n": 50},
+                result={
+                    "articles": 47,
+                    "key_themes": [
+                        "Sahel food-security displacement",
+                        "Bangladesh delta flooding",
+                        "US West fire migration",
+                        "Mediterranean crossings up 23%",
+                    ],
+                },
+                duration_ms=1040,
+            )
+            fake_tool(
+                name="fetch_survey_data",
+                args={"source": "UNHCR", "topic": "climate_displacement"},
+                result={
+                    "displaced_2024": 32_600_000,
+                    "yoy_change_pct": 18.2,
+                    "top_regions": ["Sub-Saharan Africa", "South Asia", "Central America"],
+                },
+                duration_ms=820,
+            )
+            fake_llm(
+                name="social.synthesize",
+                system="Synthesize social impact findings.",
+                user="Combine news themes + UNHCR data into a readable synthesis.",
+                response=(
+                    "32.6M people were climate-displaced in 2024 (+18.2% YoY). Hotspots "
+                    "cluster in Sub-Saharan Africa (food-security), South Asia (Bangladesh "
+                    "delta flooding), and Central America (drought-driven migration). News "
+                    "coverage reflects these themes but over-indexes on Mediterranean "
+                    "crossings relative to total displacement."
+                ),
+                model="gpt-4o",
+                prompt_tok=520,
+                completion_tok=145,
+                duration_ms=1230,
+            )
+            fake_llm(
+                name="social.cross_reference",
+                system="Cross-reference against climate projections.",
+                user="Does this trend correlate with temperature anomalies?",
+                response="Displacement curve tracks anomaly curve with ~2-year lag in affected regions.",
+                model="gpt-4o",
+                prompt_tok=320,
+                completion_tok=42,
+                duration_ms=310,
+            )
+
+    with fake_trajectory("parallel research: climate impact study"):
+        fake_llm(
+            name="supervisor.plan",
+            system="You coordinate multi-domain research teams.",
+            user="Produce a climate impact briefing covering: raw climate data, economic impact, and social/displacement impact. Launch specialist agents in parallel.",
+            response=(
+                "Dispatching three agents in parallel:\n"
+                "  1. climate_data_agent  — NOAA + IPCC\n"
+                "  2. economic_analysis_agent — World Bank GDP impact\n"
+                "  3. social_impact_agent — UNHCR + news\n"
+                "Will synthesize once all three report back."
+            ),
+            model="claude-opus-4-7",
+            prompt_tok=320,
+            completion_tok=85,
+            duration_ms=510,
+        )
+
+        parallel_branches([climate_agent, economic_agent, social_agent])
+
+        fake_reasoning(
+            name="wait_for_all_agents",
+            thought="All 3 sub-agents have reported back. Ready to synthesize.",
+            duration_ms=8,
+        )
+
+        fake_llm(
+            name="supervisor.synthesize",
+            system="You synthesize multi-agent research into a single briefing.",
+            user="Combine climate data, economic impact, and social impact into a 3-paragraph briefing.",
+            response=(
+                "**Climate trajectory.** Global temperature anomaly has risen from 1.14°C (2020) to 1.52°C (2025) above pre-industrial baseline. IPCC AR6 projects the 1.5°C threshold is likely crossed in the early 2030s across all emissions scenarios.\n\n"
+                "**Economic impact.** At a 1.5°C trajectory, global 2050 GDP drags 4.2% below baseline (≈ $9.7T). At 3°C, drag widens to 18% (≈ $41.4T), concentrated in agriculture and low-lying coastal regions.\n\n"
+                "**Social impact.** 32.6M people were climate-displaced in 2024 (+18.2% YoY), concentrated in Sub-Saharan Africa (food-security), South Asia (Bangladesh delta flooding), and Central America (drought-driven migration). Displacement tracks the temperature anomaly curve with roughly a two-year lag in affected regions.\n\n"
+                "**Conclusion.** Warming, economic drag, and forced displacement are not independent trends — they correlate strongly and accelerate together. Mitigation spending that averts $1 of climate drag also averts meaningful displacement downstream."
+            ),
+            model="claude-opus-4-7",
+            prompt_tok=920,
+            completion_tok=280,
+            duration_ms=1740,
+        )
+
+
 def traj_nested_subagents() -> None:
     with fake_trajectory("triage + resolve support ticket"):
         with fake_agent("ticket_triage_agent", "classifies ticket and dispatches to specialist"):
@@ -813,6 +1051,7 @@ def main() -> int:
         ("parallel customer enrichment", traj_parallel_enrich),
         ("deep reasoning: postgres → cockroach", traj_deep_reasoning),
         ("nested sub-agents: support triage", traj_nested_subagents),
+        ("parallel sub-agents: climate impact study", traj_parallel_research),
     ]
 
     print("Seeding demo trajectories…")
