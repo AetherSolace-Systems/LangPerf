@@ -9,7 +9,14 @@ export async function middleware(request: NextRequest) {
   }
 
   const hasSession = request.cookies.has("langperf_session");
-  if (hasSession) return NextResponse.next();
+  if (hasSession) {
+    if (pathname === "/") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/queue";
+      return NextResponse.redirect(url);
+    }
+    return NextResponse.next();
+  }
 
   const apiBase = process.env.LANGPERF_API_URL ?? "http://localhost:4318";
   try {

@@ -7,6 +7,7 @@ import { RAIL_ITEMS, type RailItem } from "@/components/shell/nav-config";
 function isActive(pathname: string, item: RailItem): boolean {
   if (item.v2) return false;
   if (item.href === "/") return pathname === "/";
+  if (item.exact) return pathname === item.href;
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 

@@ -10,6 +10,7 @@ export type RailItem = {
   glyph: string;      // single-char mono glyph
   href: string;       // href used when enabled
   v2?: boolean;       // true ⇒ render disabled with a "v2 · coming" tooltip
+  exact?: boolean;    // true ⇒ only activate on exact pathname match
   group?: "primary" | "later" | "footer";
 };
 
@@ -18,7 +19,8 @@ export const RAIL_ITEMS: RailItem[] = [
   { id: "agents",   label: "agents",  glyph: "◇", href: "/agents",    group: "primary" },
   { id: "history",  label: "history", glyph: "≡", href: "/history",   group: "primary" },
   { id: "logs",     label: "logs",    glyph: "⌘", href: "/logs",      group: "primary" },
-  { id: "triage",   label: "triage",  glyph: "!", href: "#",          v2: true, group: "later" },
+  { id: "queue",    label: "queue",    glyph: "≔", href: "/queue",      exact: true, group: "later" },
+  { id: "clusters", label: "clusters", glyph: "⬡", href: "/queue/clusters", group: "later" },
   { id: "evals",    label: "evals",   glyph: "✓", href: "#",          v2: true, group: "later" },
   { id: "data",     label: "data",    glyph: "↓", href: "#",          v2: true, group: "later" },
   { id: "config",   label: "config",  glyph: "⚙", href: "/settings",  group: "footer" },

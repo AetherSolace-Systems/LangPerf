@@ -1,8 +1,12 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { getTrajectory } from "@/lib/api";
+import { fetchTrajectoryHits } from "@/lib/triage";
 import { TrajectoryView } from "@/components/trajectory-view";
 import { AppShell } from "@/components/shell/app-shell";
+import { ContextSidebar } from "@/components/shell/context-sidebar";
+import { HeuristicHitsPanel } from "@/components/queue/heuristic-hits-panel";
 import { Chip } from "@/components/ui/chip";
 
 export const dynamic = "force-dynamic";
@@ -13,12 +17,19 @@ export default async function TrajectoryPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const cookie = headers().get("cookie") ?? "";
   let traj;
   try {
     traj = await getTrajectory(id);
   } catch (err) {
     if (err instanceof Error && err.message.includes("404")) notFound();
     throw err;
+  }
+  let hits: import("@/lib/triage").HeuristicHit[] = [];
+  try {
+    hits = await fetchTrajectoryHits(id, cookie);
+  } catch {
+    // hits are best-effort; don't crash the page if triage API is absent
   }
 
   const serviceLabel = traj.service_name;
@@ -32,12 +43,19 @@ export default async function TrajectoryPage({
     </>
   );
 
+  const sidebar = hits.length > 0 ? (
+    <ContextSidebar>
+      <HeuristicHitsPanel hits={hits} />
+    </ContextSidebar>
+  ) : undefined;
+
   return (
     <AppShell
       topBar={{
         breadcrumb,
         right: <Chip>env: {envLabel}</Chip>,
       }}
+      contextSidebar={sidebar}
     >
       {/* Identity strip — Phase 1 fills it from service_name/environment since
           Agents aren't first-class yet. Phase 2 swaps to real agent+version. */}

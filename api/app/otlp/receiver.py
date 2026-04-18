@@ -13,7 +13,8 @@ import logging
 from fastapi import APIRouter, Depends, Header, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db import get_session
+from app.db import SessionLocal, get_session
+from app.ingest.hook import schedule_heuristics
 from app.ingest.org import get_default_org_id
 from app.otlp.decoder import decode
 from app.otlp.ingest import ingest_bundles, recompute_totals
@@ -55,5 +56,7 @@ async def receive_traces(
     touched = await ingest_bundles(session, bundles, org_id)
     await recompute_totals(session, touched)
     await session.commit()
+
+    schedule_heuristics(SessionLocal, list(touched))
 
     return Response(content=b"", media_type="application/x-protobuf", status_code=200)
