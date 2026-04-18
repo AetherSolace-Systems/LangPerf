@@ -128,3 +128,16 @@ async def logout(
 @router.get("/me")
 async def me(user=require_user()):
     return {"user": _to_dto(user).model_dump()}
+
+
+@router.get("/org/members")
+async def list_members(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    user=require_user(),
+):
+    from sqlalchemy import select
+    result = await session.execute(
+        select(User).where(User.org_id == user.org_id).order_by(User.display_name)
+    )
+    rows = result.scalars().all()
+    return [{"id": u.id, "display_name": u.display_name} for u in rows]
