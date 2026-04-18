@@ -270,3 +270,15 @@ class Notification(Base):
     payload: Mapped[dict] = mapped_column(JsonB, nullable=False, default=dict)
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class SharedLink(Base):
+    __tablename__ = "shared_links"
+
+    token: Mapped[str] = mapped_column(String(64), primary_key=True)
+    org_id: Mapped[str] = mapped_column(UUIDStr, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    trajectory_id: Mapped[str] = mapped_column(UUIDStr, ForeignKey("trajectories.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_by: Mapped[str] = mapped_column(UUIDStr, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
