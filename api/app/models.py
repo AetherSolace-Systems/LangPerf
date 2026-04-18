@@ -13,6 +13,7 @@ from typing import Any, Optional
 from sqlalchemy import (
     Boolean,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     JSON,
@@ -307,3 +308,16 @@ class TrajectoryFailureMode(Base):
     failure_mode_id: Mapped[str] = mapped_column(UUIDStr, ForeignKey("failure_modes.id", ondelete="CASCADE"), primary_key=True)
     tagged_by: Mapped[str] = mapped_column(UUIDStr, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     tagged_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class HeuristicHit(Base):
+    __tablename__ = "heuristic_hits"
+
+    id: Mapped[str] = mapped_column(UUIDStr, primary_key=True, default=lambda: str(uuid.uuid4()))
+    org_id: Mapped[str] = mapped_column(UUIDStr, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    trajectory_id: Mapped[str] = mapped_column(UUIDStr, ForeignKey("trajectories.id", ondelete="CASCADE"), nullable=False, index=True)
+    heuristic: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    severity: Mapped[float] = mapped_column(Float, nullable=False, default=0.5)
+    signature: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    details: Mapped[dict] = mapped_column(JsonB, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
