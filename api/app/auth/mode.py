@@ -1,5 +1,4 @@
 import os
-import uuid
 from dataclasses import dataclass
 
 from sqlalchemy import func, select
@@ -10,15 +9,15 @@ from app.models import User
 
 @dataclass(frozen=True)
 class SyntheticUser:
-    id: uuid.UUID
-    org_id: uuid.UUID
+    id: str
+    org_id: str
     email: str
     display_name: str
     is_admin: bool
 
 
-DEFAULT_ORG_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
-DEFAULT_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000002")
+DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001"
+DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000002"
 DEFAULT_SINGLE_USER = SyntheticUser(
     id=DEFAULT_USER_ID,
     org_id=DEFAULT_ORG_ID,
