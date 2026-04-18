@@ -6,6 +6,7 @@ Large payloads land in JSONB `attributes` on spans — Postgres TOASTs values
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 from typing import Any, Optional
 
@@ -30,6 +31,17 @@ UUIDStr = String(36).with_variant(UUID(as_uuid=False), "postgresql")
 
 class Base(DeclarativeBase):
     pass
+
+
+class Organization(Base):
+    __tablename__ = "organizations"
+
+    id: Mapped[str] = mapped_column(UUIDStr, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    slug: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class Agent(Base):
