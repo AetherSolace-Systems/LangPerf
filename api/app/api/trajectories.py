@@ -9,6 +9,7 @@ from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.auth.deps import require_user
 from app.constants import ALLOWED_TAGS
 from app.db import get_session
 from app.models import Span, Trajectory
@@ -67,9 +68,10 @@ async def list_trajectories(
     environment: Optional[str] = Query(default=None),
     q: Optional[str] = Query(default=None, description="free-text search"),
     session: AsyncSession = Depends(get_session),
+    user=require_user(),
 ) -> TrajectoryListResponse:
     base = _apply_filters(
-        select(Trajectory),
+        select(Trajectory).where(Trajectory.org_id == user.org_id),
         tag=tag,
         service=service,
         environment=environment,
@@ -78,7 +80,9 @@ async def list_trajectories(
     total = (
         await session.execute(
             _apply_filters(
-                select(func.count()).select_from(Trajectory),
+                select(func.count()).select_from(Trajectory).where(
+                    Trajectory.org_id == user.org_id
+                ),
                 tag=tag,
                 service=service,
                 environment=environment,
@@ -94,11 +98,14 @@ async def list_trajectories(
 
 
 @router.get("/facets", response_model=FacetsResponse)
-async def get_facets(session: AsyncSession = Depends(get_session)) -> FacetsResponse:
+async def get_facets(
+    session: AsyncSession = Depends(get_session),
+    user=require_user(),
+) -> FacetsResponse:
     services = (
         await session.execute(
             select(Trajectory.service_name)
-            .where(Trajectory.service_name.is_not(None))
+            .where(Trajectory.service_name.is_not(None), Trajectory.org_id == user.org_id)
             .distinct()
             .order_by(Trajectory.service_name)
         )
@@ -106,7 +113,7 @@ async def get_facets(session: AsyncSession = Depends(get_session)) -> FacetsResp
     environments = (
         await session.execute(
             select(Trajectory.environment)
-            .where(Trajectory.environment.is_not(None))
+            .where(Trajectory.environment.is_not(None), Trajectory.org_id == user.org_id)
             .distinct()
             .order_by(Trajectory.environment)
         )
@@ -114,7 +121,7 @@ async def get_facets(session: AsyncSession = Depends(get_session)) -> FacetsResp
     tags = (
         await session.execute(
             select(Trajectory.status_tag)
-            .where(Trajectory.status_tag.is_not(None))
+            .where(Trajectory.status_tag.is_not(None), Trajectory.org_id == user.org_id)
             .distinct()
             .order_by(Trajectory.status_tag)
         )
@@ -130,10 +137,11 @@ async def get_facets(session: AsyncSession = Depends(get_session)) -> FacetsResp
 async def get_trajectory(
     trajectory_id: str,
     session: AsyncSession = Depends(get_session),
+    user=require_user(),
 ) -> TrajectoryDetail:
     result = await session.execute(
         select(Trajectory)
-        .where(Trajectory.id == trajectory_id)
+        .where(Trajectory.id == trajectory_id, Trajectory.org_id == user.org_id)
         .options(selectinload(Trajectory.spans))
     )
     traj = result.scalar_one_or_none()
@@ -147,8 +155,14 @@ async def patch_trajectory(
     trajectory_id: str,
     patch: TrajectoryPatch,
     session: AsyncSession = Depends(get_session),
+    user=require_user(),
 ) -> TrajectorySummary:
-    traj = await session.get(Trajectory, trajectory_id)
+    result = await session.execute(
+        select(Trajectory).where(
+            Trajectory.id == trajectory_id, Trajectory.org_id == user.org_id
+        )
+    )
+    traj = result.scalar_one_or_none()
     if traj is None:
         raise HTTPException(status_code=404, detail="trajectory not found")
 

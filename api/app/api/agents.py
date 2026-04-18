@@ -11,6 +11,7 @@ from sqlalchemy import Integer, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.auth.deps import require_user
 from app.db import get_session
 from app.models import Agent, AgentVersion, Span, Trajectory
 from app.otlp.latency_series import latency_series
@@ -42,9 +43,14 @@ async def list_agents(
     with_metrics: bool = Query(default=False),
     window: str = Query(default="7d", pattern="^(24h|7d|30d)$"),
     session: AsyncSession = Depends(get_session),
+    user=require_user(),
 ):
     result = await session.execute(
-        select(Agent).order_by(Agent.name).limit(limit).offset(offset)
+        select(Agent)
+        .where(Agent.org_id == user.org_id)
+        .order_by(Agent.name)
+        .limit(limit)
+        .offset(offset)
     )
     agents = list(result.scalars().all())
 
@@ -61,6 +67,7 @@ async def list_agents(
                 .where(
                     Trajectory.agent_id.is_not(None),
                     Trajectory.started_at >= since,
+                    Trajectory.org_id == user.org_id,
                 )
                 .group_by(Trajectory.agent_id)
             )
@@ -76,6 +83,7 @@ async def list_agents(
                     Trajectory.agent_id.is_not(None),
                     Trajectory.started_at >= since,
                     Trajectory.status_tag == "bad",
+                    Trajectory.org_id == user.org_id,
                 )
                 .group_by(Trajectory.agent_id)
             )
@@ -96,6 +104,7 @@ async def list_agents(
                     Trajectory.agent_id.is_not(None),
                     Trajectory.started_at >= since,
                     Trajectory.duration_ms.is_not(None),
+                    Trajectory.org_id == user.org_id,
                 )
                 .group_by(Trajectory.agent_id)
             )
@@ -109,6 +118,7 @@ async def list_agents(
             .where(
                 Trajectory.agent_id.is_not(None),
                 Trajectory.started_at >= since,
+                Trajectory.org_id == user.org_id,
             )
             .group_by(Trajectory.agent_id, "day")
             .order_by(Trajectory.agent_id, "day")
@@ -136,6 +146,7 @@ async def list_agents(
                 Trajectory.agent_id.is_not(None),
                 Trajectory.started_at >= since,
                 Trajectory.environment.is_not(None),
+                Trajectory.org_id == user.org_id,
             )
             .distinct()
         )
@@ -167,10 +178,11 @@ async def list_agents(
 async def get_agent(
     name: str,
     session: AsyncSession = Depends(get_session),
+    user=require_user(),
 ) -> AgentDetail:
     result = await session.execute(
         select(Agent)
-        .where(Agent.name == name)
+        .where(Agent.name == name, Agent.org_id == user.org_id)
         .options(selectinload(Agent.versions))
     )
     agent = result.scalar_one_or_none()
@@ -184,10 +196,11 @@ async def patch_agent(
     name: str,
     patch: AgentPatch,
     session: AsyncSession = Depends(get_session),
+    user=require_user(),
 ) -> AgentDetail:
     result = await session.execute(
         select(Agent)
-        .where(Agent.name == name)
+        .where(Agent.name == name, Agent.org_id == user.org_id)
         .options(selectinload(Agent.versions))
     )
     agent = result.scalar_one_or_none()
@@ -203,7 +216,11 @@ async def patch_agent(
             )
         collision = (
             await session.execute(
-                select(Agent.id).where(Agent.name == new_name, Agent.id != agent.id)
+                select(Agent.id).where(
+                    Agent.name == new_name,
+                    Agent.id != agent.id,
+                    Agent.org_id == user.org_id,
+                )
             )
         ).scalar_one_or_none()
         if collision:
@@ -231,8 +248,10 @@ _WINDOW_DELTA = {
 }
 
 
-async def _resolve_agent(session: AsyncSession, name: str) -> Agent:
-    result = await session.execute(select(Agent).where(Agent.name == name))
+async def _resolve_agent(session: AsyncSession, name: str, org_id: str) -> Agent:
+    result = await session.execute(
+        select(Agent).where(Agent.name == name, Agent.org_id == org_id)
+    )
     agent = result.scalar_one_or_none()
     if agent is None:
         raise HTTPException(status_code=404, detail="agent not found")
@@ -244,8 +263,9 @@ async def get_agent_metrics(
     name: str,
     window: str = Query(default="7d", pattern="^(24h|7d|30d)$"),
     session: AsyncSession = Depends(get_session),
+    user=require_user(),
 ) -> AgentMetrics:
-    agent = await _resolve_agent(session, name)
+    agent = await _resolve_agent(session, name, user.org_id)
     since = datetime.now(tz=timezone.utc) - _WINDOW_DELTA[window]
 
     runs = (
@@ -253,6 +273,7 @@ async def get_agent_metrics(
             select(func.count()).select_from(Trajectory).where(
                 Trajectory.agent_id == agent.id,
                 Trajectory.started_at >= since,
+                Trajectory.org_id == user.org_id,
             )
         )
     ).scalar_one()
@@ -263,6 +284,7 @@ async def get_agent_metrics(
                 Trajectory.agent_id == agent.id,
                 Trajectory.started_at >= since,
                 Trajectory.status_tag == "bad",
+                Trajectory.org_id == user.org_id,
             )
         )
     ).scalar_one()
@@ -272,6 +294,7 @@ async def get_agent_metrics(
             select(func.coalesce(func.sum(Trajectory.token_count), 0)).where(
                 Trajectory.agent_id == agent.id,
                 Trajectory.started_at >= since,
+                Trajectory.org_id == user.org_id,
             )
         )
     ).scalar_one()
@@ -292,6 +315,7 @@ async def get_agent_metrics(
                 Trajectory.agent_id == agent.id,
                 Trajectory.started_at >= since,
                 Trajectory.duration_ms.is_not(None),
+                Trajectory.org_id == user.org_id,
             )
         )
     ).one()
@@ -322,8 +346,9 @@ async def get_agent_tools(
     name: str,
     window: str = Query(default="7d", pattern="^(24h|7d|30d)$"),
     session: AsyncSession = Depends(get_session),
+    user=require_user(),
 ) -> list[AgentToolUsage]:
-    agent = await _resolve_agent(session, name)
+    agent = await _resolve_agent(session, name, user.org_id)
     since = datetime.now(tz=timezone.utc) - _WINDOW_DELTA[window]
 
     result = await session.execute(
@@ -338,6 +363,7 @@ async def get_agent_tools(
         .where(
             Trajectory.agent_id == agent.id,
             Trajectory.started_at >= since,
+            Trajectory.org_id == user.org_id,
             Span.kind.in_(("tool", "tool_call")),
         )
         .group_by(Span.name)
@@ -362,13 +388,14 @@ async def get_agent_runs(
     environment: Optional[str] = Query(default=None),
     version: Optional[str] = Query(default=None, description="version label"),
     session: AsyncSession = Depends(get_session),
+    user=require_user(),
 ) -> AgentRunsResponse:
-    agent = await _resolve_agent(session, name)
+    agent = await _resolve_agent(session, name, user.org_id)
 
     stmt = (
         select(Trajectory, AgentVersion.label)
         .outerjoin(AgentVersion, AgentVersion.id == Trajectory.agent_version_id)
-        .where(Trajectory.agent_id == agent.id)
+        .where(Trajectory.agent_id == agent.id, Trajectory.org_id == user.org_id)
     )
     if environment:
         stmt = stmt.where(Trajectory.environment == environment)
@@ -410,8 +437,9 @@ async def get_agent_prompts(
     name: str,
     limit: int = Query(default=20, ge=1, le=100),
     session: AsyncSession = Depends(get_session),
+    user=require_user(),
 ) -> list[AgentPromptRow]:
-    agent = await _resolve_agent(session, name)
+    agent = await _resolve_agent(session, name, user.org_id)
     result = await session.execute(
         select(
             Trajectory.system_prompt.label("text"),
@@ -422,6 +450,7 @@ async def get_agent_prompts(
         .where(
             Trajectory.agent_id == agent.id,
             Trajectory.system_prompt.is_not(None),
+            Trajectory.org_id == user.org_id,
         )
         .group_by(Trajectory.system_prompt)
         .order_by(func.max(Trajectory.started_at).desc())
