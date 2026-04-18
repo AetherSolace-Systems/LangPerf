@@ -10,17 +10,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.api.agents import router as agents_router
+from app.api.logs import router as logs_router
 from app.api.nodes import router as nodes_router
 from app.api.overview import router as overview_router
 from app.api.runs import router as runs_router
 from app.api.trajectories import router as trajectories_router
 from app.db import engine
+from app.logs import attach_handler
 from app.otlp.receiver import router as otlp_router
 
 logging.basicConfig(
     level=os.environ.get("LANGPERF_LOG_LEVEL", "INFO"),
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
+attach_handler(level=logging._nameToLevel.get(os.environ.get("LANGPERF_LOG_LEVEL", "INFO"), logging.INFO))
 logger = logging.getLogger("langperf")
 
 
@@ -97,3 +100,4 @@ app.include_router(nodes_router)
 app.include_router(agents_router)
 app.include_router(overview_router)
 app.include_router(runs_router)
+app.include_router(logs_router)

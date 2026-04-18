@@ -1,19 +1,42 @@
+import Link from "next/link";
 import { AppShell } from "@/components/shell/app-shell";
-import { ContextSidebar, CtxHeader, CtxItem } from "@/components/shell/context-sidebar";
+import {
+  ContextSidebar,
+  CtxHeader,
+  CtxItem,
+} from "@/components/shell/context-sidebar";
 import { Chip } from "@/components/ui/chip";
+import { LiveConsole } from "@/components/logs/live-console";
+
+export const dynamic = "force-dynamic";
+
+const SOURCE_DESCRIPTIONS: Array<{ id: string; label: string; note: string }> = [
+  { id: "langperf", label: "langperf", note: "app-level events" },
+  { id: "uvicorn", label: "uvicorn", note: "request access + lifecycle" },
+  { id: "fastapi", label: "fastapi", note: "app framework" },
+  { id: "sqlalchemy", label: "sqlalchemy", note: "queries (off by default)" },
+  { id: "alembic", label: "alembic", note: "migrations" },
+];
 
 export default function Logs() {
   const sidebar = (
     <ContextSidebar>
       <CtxHeader>Sources</CtxHeader>
-      <CtxItem>● api-server</CtxItem>
-      <CtxItem>● ingest</CtxItem>
-      <CtxItem>● otel-collector</CtxItem>
-      <CtxItem>● web</CtxItem>
-      <CtxHeader>Levels</CtxHeader>
-      <CtxItem>INFO · WARN · ERROR</CtxItem>
+      {SOURCE_DESCRIPTIONS.map((s) => (
+        <div
+          key={s.id}
+          className="px-[6px] py-[4px] rounded-[2px] my-[1px]"
+        >
+          <div className="font-mono text-[12px] text-warm-fog">{s.label}</div>
+          <div className="font-mono text-[10px] text-patina">{s.note}</div>
+        </div>
+      ))}
       <CtxHeader>Forwarding</CtxHeader>
-      <CtxItem>(configure in Settings)</CtxItem>
+      <CtxItem>
+        <Link href="/settings/log-forwarding" className="text-aether-teal hover:underline">
+          configure →
+        </Link>
+      </CtxItem>
     </ContextSidebar>
   );
 
@@ -21,19 +44,11 @@ export default function Logs() {
     <AppShell
       topBar={{
         breadcrumb: <span className="font-medium text-warm-fog">Logs</span>,
-        right: <Chip>env: all</Chip>,
+        right: <Chip variant="primary">live</Chip>,
       }}
       contextSidebar={sidebar}
     >
-      <div className="border border-[color:var(--border)] border-l-2 border-l-peach-neon rounded-[3px] bg-[color:var(--surface)] p-[14px]">
-        <div className="font-mono text-[9px] text-peach-neon uppercase tracking-[0.1em] mb-[4px]">
-          phase 5
-        </div>
-        <div className="text-[13px] text-warm-fog">
-          Real-time server log stream (SSE) with source + level filters lands in Phase 5,
-          together with Settings → Log forwarding.
-        </div>
-      </div>
+      <LiveConsole />
     </AppShell>
   );
 }
