@@ -2,7 +2,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,13 +25,13 @@ COOKIE_KW = dict(
 
 
 class SignupPayload(BaseModel):
-    email: str = Field(min_length=1, max_length=320)
+    email: EmailStr
     password: str = Field(min_length=8, max_length=256)
     display_name: str = Field(min_length=1, max_length=255)
 
 
 class LoginPayload(BaseModel):
-    email: str = Field(min_length=1, max_length=320)
+    email: EmailStr
     password: str
 
 
