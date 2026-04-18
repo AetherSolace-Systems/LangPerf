@@ -7,7 +7,7 @@ Large payloads land in JSONB `attributes` on spans — Postgres TOASTs values
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from sqlalchemy import (
@@ -236,3 +236,25 @@ class Span(Base):
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     trajectory: Mapped["Trajectory"] = relationship(back_populates="spans")
+
+
+class Comment(Base):
+    __tablename__ = "comments"
+
+    id: Mapped[str] = mapped_column(UUIDStr, primary_key=True, default=lambda: str(uuid.uuid4()))
+    org_id: Mapped[str] = mapped_column(UUIDStr, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    trajectory_id: Mapped[str] = mapped_column(UUIDStr, ForeignKey("trajectories.id", ondelete="CASCADE"), nullable=False, index=True)
+    span_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    author_id: Mapped[str] = mapped_column(UUIDStr, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    parent_comment_id: Mapped[str | None] = mapped_column(UUIDStr, ForeignKey("comments.id", ondelete="CASCADE"), nullable=True)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    resolved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class CommentMention(Base):
+    __tablename__ = "comment_mentions"
+
+    comment_id: Mapped[str] = mapped_column(UUIDStr, ForeignKey("comments.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[str] = mapped_column(UUIDStr, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
