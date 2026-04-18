@@ -181,6 +181,9 @@ class Trajectory(Base):
         nullable=True,
         index=True,
     )
+    assigned_user_id: Mapped[str | None] = mapped_column(
+        UUIDStr, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     spans: Mapped[list["Span"]] = relationship(
         back_populates="trajectory",
