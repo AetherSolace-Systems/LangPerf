@@ -11,7 +11,15 @@ from app.auth.mode import is_single_user_mode
 from app.auth.password import hash_password, verify_password
 from app.auth.session import create_session, delete_session
 from app.db import get_session
-from app.models import Organization, User
+from app.models import FailureMode, Organization, User
+
+DEFAULT_FAILURE_MODES = [
+    ("wrong_tool", "Wrong tool", "warn"),
+    ("bad_args", "Bad args", "warn"),
+    ("hallucination", "Hallucination", "peach-neon"),
+    ("loop", "Loop", "peach-neon"),
+    ("misunderstood_intent", "Misunderstood intent", "steel-mist"),
+]
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -81,6 +89,10 @@ async def signup(
     )
     session.add(user)
     await session.flush()
+    # Seed default failure modes for the new org
+    for slug, label, color in DEFAULT_FAILURE_MODES:
+        session.add(FailureMode(org_id=org.id, slug=slug, label=label, color=color))
+    await session.flush()
     sess = await create_session(session, user.id)
     response.set_cookie(value=sess.token, **COOKIE_KW)
     return {"user": _to_dto(user).model_dump()}
@@ -116,3 +128,16 @@ async def logout(
 @router.get("/me")
 async def me(user=require_user()):
     return {"user": _to_dto(user).model_dump()}
+
+
+@router.get("/org/members")
+async def list_members(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    user=require_user(),
+):
+    from sqlalchemy import select
+    result = await session.execute(
+        select(User).where(User.org_id == user.org_id).order_by(User.display_name)
+    )
+    rows = result.scalars().all()
+    return [{"id": u.id, "display_name": u.display_name} for u in rows]

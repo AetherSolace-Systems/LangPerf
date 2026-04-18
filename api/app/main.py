@@ -12,6 +12,11 @@ from sqlalchemy import text
 
 from app.api import auth as auth_api
 from app.api.agents import router as agents_router
+from app.api.comments import router as comments_router
+from app.api.notifications import router as notifications_router
+from app.api.reviewers import router as reviewers_router
+from app.api.shared_links import router as shared_links_router
+from app.api.failure_modes import router as failure_modes_router
 from app.api.logs import router as logs_router
 from app.api.nodes import router as nodes_router
 from app.api.overview import router as overview_router
@@ -113,3 +118,8 @@ app.include_router(overview_router)
 app.include_router(runs_router)
 app.include_router(logs_router)
 app.include_router(settings_router)
+app.include_router(comments_router)
+app.include_router(notifications_router)
+app.include_router(reviewers_router)
+app.include_router(shared_links_router)
+app.include_router(failure_modes_router)

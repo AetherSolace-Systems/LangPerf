@@ -63,3 +63,13 @@ export async function logoutRequest(): Promise<void> {
     credentials: "include",
   });
 }
+
+export async function listMembers(cookie?: string): Promise<{ id: string; display_name: string }[]> {
+  const base = cookie ? SERVER_API_URL : CLIENT_API_URL;
+  const res = await fetch(`${base}/api/auth/org/members`,
+    cookie
+      ? { headers: { cookie }, cache: "no-store" }
+      : { credentials: "include", cache: "no-store" },
+  );
+  return res.json();
+}
