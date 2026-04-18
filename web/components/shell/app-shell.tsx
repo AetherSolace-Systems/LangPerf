@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { headers } from "next/headers";
+import { NotificationsDrawer } from "@/components/collab/notifications-drawer";
 import { IconRail } from "@/components/shell/icon-rail";
 import { TopBar, type TopBarProps } from "@/components/shell/top-bar";
 import { UserMenu } from "@/components/shell/user-menu";
@@ -26,6 +27,7 @@ export async function AppShell({ topBar, contextSidebar, children }: AppShellPro
   const rightContent = (
     <div className="flex items-center gap-2">
       {topBar?.right}
+      <NotificationsDrawer />
       <UserMenu user={me} />
     </div>
   );
