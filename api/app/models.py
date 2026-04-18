@@ -1,4 +1,4 @@
-"""ORM models: Trajectory, Span, Agent, AgentVersion.
+"""ORM models: Organization, User, Session, Agent, AgentVersion, Trajectory, Span, WorkspaceSetting.
 
 Large payloads land in JSONB `attributes` on spans — Postgres TOASTs values
 >2KB automatically so trajectories with long context windows compress in place.
@@ -79,7 +79,10 @@ class Session(Base):
 class Agent(Base):
     __tablename__ = "agents"
 
-    id: Mapped[str] = mapped_column(UUIDStr, primary_key=True)
+    id: Mapped[str] = mapped_column(UUIDStr, primary_key=True, default=lambda: str(uuid.uuid4()))
+    org_id: Mapped[str] = mapped_column(
+        UUIDStr, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     signature: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
     name: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
     display_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
@@ -140,13 +143,16 @@ class AgentVersion(Base):
 class Trajectory(Base):
     __tablename__ = "trajectories"
 
-    id: Mapped[str] = mapped_column(UUIDStr, primary_key=True)
+    id: Mapped[str] = mapped_column(UUIDStr, primary_key=True, default=lambda: str(uuid.uuid4()))
+    org_id: Mapped[str] = mapped_column(
+        UUIDStr, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     trace_id: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
     service_name: Mapped[str] = mapped_column(String, nullable=False, index=True)
     environment: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
     name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     started_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
     ended_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
@@ -190,6 +196,9 @@ class Trajectory(Base):
 class WorkspaceSetting(Base):
     __tablename__ = "workspace_settings"
 
+    org_id: Mapped[str] = mapped_column(
+        UUIDStr, ForeignKey("organizations.id", ondelete="CASCADE"), primary_key=True
+    )
     key: Mapped[str] = mapped_column(String, primary_key=True)
     value: Mapped[dict[str, Any]] = mapped_column(JsonB, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
