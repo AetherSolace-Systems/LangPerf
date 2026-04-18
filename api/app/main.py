@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import logging
 import os
 import subprocess
@@ -14,9 +15,11 @@ from app.api.logs import router as logs_router
 from app.api.nodes import router as nodes_router
 from app.api.overview import router as overview_router
 from app.api.runs import router as runs_router
+from app.api.settings import router as settings_router
 from app.api.trajectories import router as trajectories_router
 from app.db import engine
 from app.logs import attach_handler
+from app.logs.file_forwarder import start_background_task as start_file_forwarder
 from app.otlp.receiver import router as otlp_router
 
 logging.basicConfig(
@@ -68,9 +71,15 @@ async def lifespan(app: FastAPI):
         await asyncio.to_thread(_run_alembic, "stamp", "0001")
     logger.info("alembic upgrade head")
     await asyncio.to_thread(_run_alembic, "upgrade", "head")
+    file_fwd_task = start_file_forwarder()
     logger.info("langperf-api ready")
-    yield
-    await engine.dispose()
+    try:
+        yield
+    finally:
+        file_fwd_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await file_fwd_task
+        await engine.dispose()
 
 
 app = FastAPI(title="LangPerf API", version="0.1.0", lifespan=lifespan)
@@ -101,3 +110,4 @@ app.include_router(agents_router)
 app.include_router(overview_router)
 app.include_router(runs_router)
 app.include_router(logs_router)
+app.include_router(settings_router)

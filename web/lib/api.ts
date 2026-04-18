@@ -289,6 +289,40 @@ export async function getAgentTools(
   );
 }
 
+export type LogForwardingConfig = {
+  file: {
+    enabled: boolean;
+    path: string;
+    rotate_daily: boolean;
+    keep_days: number;
+  };
+  datadog: {
+    enabled: boolean;
+    site: string;
+    api_key_env: string;
+  };
+  loki: {
+    enabled: boolean;
+    endpoint: string;
+    labels: Record<string, string>;
+  };
+  otlp: {
+    enabled: boolean;
+    endpoint: string;
+    headers: Record<string, string>;
+  };
+  kinds: {
+    server_logs: boolean;
+    trace_events: boolean;
+    full_payloads: boolean;
+    sdk_diagnostics: boolean;
+  };
+};
+
+export async function getLogForwarding(): Promise<LogForwardingConfig> {
+  return apiFetch<LogForwardingConfig>(`/api/settings/log-forwarding`);
+}
+
 export type AgentPromptRow = {
   text: string;
   runs: number;
