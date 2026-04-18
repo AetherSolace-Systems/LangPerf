@@ -21,6 +21,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import String, and_, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.deps import require_user
 from app.db import get_session
 from app.models import Agent, AgentVersion, Span, Trajectory
 from app.schemas import AgentRunRow, RunsResponse
@@ -55,11 +56,13 @@ async def list_runs(
     limit: int = Query(default=50, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_session),
+    user=require_user(),
 ) -> RunsResponse:
     stmt = (
         select(Trajectory, Agent.name.label("agent_name"), AgentVersion.label.label("version_label"))
         .outerjoin(Agent, Agent.id == Trajectory.agent_id)
         .outerjoin(AgentVersion, AgentVersion.id == Trajectory.agent_version_id)
+        .where(Trajectory.org_id == user.org_id)
     )
 
     conditions = []

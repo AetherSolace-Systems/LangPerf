@@ -1,7 +1,7 @@
 // Server-side API client for talking to langperf-api across the docker network.
 // Client-side code should use `NEXT_PUBLIC_LANGPERF_API_URL` (exposed via env).
 
-const SERVER_API_URL =
+export const SERVER_API_URL =
   process.env.LANGPERF_API_URL ?? "http://localhost:4318";
 
 export const CLIENT_API_URL =

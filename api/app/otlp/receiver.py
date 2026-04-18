@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, Header, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
+from app.ingest.org import get_default_org_id
 from app.otlp.decoder import decode
 from app.otlp.ingest import ingest_bundles, recompute_totals
 
@@ -48,7 +49,10 @@ async def receive_traces(
         len(body),
     )
 
-    touched = await ingest_bundles(session, bundles)
+    # TODO(v2b): scope OTLP ingestion per API key once we add api_keys table
+    org_id = await get_default_org_id(session)
+
+    touched = await ingest_bundles(session, bundles, org_id)
     await recompute_totals(session, touched)
     await session.commit()
 

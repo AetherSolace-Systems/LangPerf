@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
+import { headers } from "next/headers";
 import { IconRail } from "@/components/shell/icon-rail";
 import { TopBar, type TopBarProps } from "@/components/shell/top-bar";
+import { UserMenu } from "@/components/shell/user-menu";
+import { fetchMe } from "@/lib/auth";
 
 export type AppShellProps = {
   /** Top-bar props forwarded verbatim. */
@@ -11,10 +14,25 @@ export type AppShellProps = {
   children: ReactNode;
 };
 
-export function AppShell({ topBar, contextSidebar, children }: AppShellProps) {
+export async function AppShell({ topBar, contextSidebar, children }: AppShellProps) {
+  let me = null;
+  try {
+    const cookie = headers().get("cookie") ?? undefined;
+    me = await fetchMe(cookie);
+  } catch {
+    // fetchMe failure (e.g. API down) should not crash the shell
+  }
+
+  const rightContent = (
+    <div className="flex items-center gap-2">
+      {topBar?.right}
+      <UserMenu user={me} />
+    </div>
+  );
+
   return (
     <div className="min-h-screen flex flex-col bg-[color:var(--background)] text-[color:var(--foreground)]">
-      <TopBar {...(topBar ?? {})} />
+      <TopBar {...(topBar ?? {})} right={rightContent} />
       <div className="flex flex-1 min-h-0">
         <IconRail />
         {contextSidebar}

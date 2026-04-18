@@ -6,10 +6,11 @@ import asyncio
 import json
 from typing import AsyncIterator, Optional
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from app.auth.deps import require_user
 from app.logs import buffer
 from app.logs.buffer import LogEvent
 
@@ -63,6 +64,7 @@ async def recent_logs(
     source: Optional[str] = Query(default=None, description="csv of source tags"),
     level: Optional[str] = Query(default=None, description="min level: INFO|WARN|ERROR"),
     q: Optional[str] = Query(default=None, description="substring search"),
+    user=require_user(),
 ) -> list[LogEventOut]:
     sources = _parse_sources(source)
     min_level = _parse_level(level)
@@ -81,6 +83,7 @@ async def stream_logs(
     source: Optional[str] = Query(default=None),
     level: Optional[str] = Query(default=None),
     q: Optional[str] = Query(default=None),
+    user=require_user(),
 ) -> StreamingResponse:
     sources = _parse_sources(source)
     min_level = _parse_level(level)

@@ -109,6 +109,24 @@ langperf/
     └── ROADMAP.md        # Explicit v2+ deferrals
 ```
 
+## Authentication
+
+LangPerf v2 ships with email + password authentication and one-org-per-deployment.
+
+**Fresh deployment**:
+
+1. First visit to any page lands on `/login`.
+2. The login page shows a "Set up LangPerf" form — create the first admin account. This bootstraps the default org and makes you its admin.
+3. Subsequent visitors see "Sign in to LangPerf" and must be invited (invite flow is v2b scope).
+
+**Single-user mode**:
+
+Set the environment variable `LANGPERF_SINGLE_USER=1` to bypass login entirely. Useful for local dev. The app also operates in single-user mode automatically when no users exist.
+
+**Cookies**:
+
+Session cookies are httponly and `samesite=lax`. Set `secure=True` in production behind HTTPS (edit `api/app/api/auth.py`'s `COOKIE_KW`).
+
 ## Instrumentation without the SDK
 
 LangPerf's `/v1/traces` is standard OTLP/HTTP. Any OTel source works with zero

@@ -53,7 +53,7 @@ def _version_label(package_version: Optional[str], short_sha: Optional[str]) -> 
 
 
 async def resolve_agent_and_version(
-    session: AsyncSession, resource_attrs: dict[str, Any]
+    session: AsyncSession, resource_attrs: dict[str, Any], *, org_id: str
 ) -> tuple[Optional[str], Optional[str]]:
     """Return (agent_id, agent_version_id) for the resource attrs.
 
@@ -76,6 +76,7 @@ async def resolve_agent_and_version(
         signature=signature,
         language=language,
         git_origin=git_origin,
+        org_id=org_id,
     )
     version = await _upsert_version(
         session,
@@ -93,6 +94,7 @@ async def _upsert_agent(
     signature: str,
     language: Optional[str],
     git_origin: Optional[str],
+    org_id: str,
 ) -> Agent:
     existing = (
         await session.execute(select(Agent).where(Agent.signature == signature))
@@ -113,6 +115,7 @@ async def _upsert_agent(
     name = await _pick_unused_name(session)
     new = Agent(
         id=str(uuid.uuid4()),
+        org_id=org_id,
         signature=signature,
         name=name,
         language=language,

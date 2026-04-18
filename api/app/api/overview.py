@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import Integer, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.deps import require_user
 from app.db import get_session
 from app.models import Agent, Span, Trajectory
 from app.otlp.latency_series import latency_series
@@ -40,13 +41,15 @@ _WINDOW_DELTA = {
 async def get_overview(
     window: str = Query(default="7d", pattern="^(24h|7d|30d)$"),
     session: AsyncSession = Depends(get_session),
+    user=require_user(),
 ) -> OverviewResponse:
     since = datetime.now(tz=timezone.utc) - _WINDOW_DELTA[window]
 
     runs = (
         await session.execute(
             select(func.count()).select_from(Trajectory).where(
-                Trajectory.started_at >= since
+                Trajectory.started_at >= since,
+                Trajectory.org_id == user.org_id,
             )
         )
     ).scalar_one()
@@ -56,6 +59,7 @@ async def get_overview(
             select(func.count(func.distinct(Trajectory.agent_id))).where(
                 Trajectory.agent_id.is_not(None),
                 Trajectory.started_at >= since,
+                Trajectory.org_id == user.org_id,
             )
         )
     ).scalar_one()
@@ -65,6 +69,7 @@ async def get_overview(
             select(func.count()).select_from(Trajectory).where(
                 Trajectory.started_at >= since,
                 Trajectory.status_tag.is_not(None),
+                Trajectory.org_id == user.org_id,
             )
         )
     ).scalar_one()
@@ -74,6 +79,7 @@ async def get_overview(
             select(func.count()).select_from(Trajectory).where(
                 Trajectory.started_at >= since,
                 Trajectory.status_tag == "bad",
+                Trajectory.org_id == user.org_id,
             )
         )
     ).scalar_one()
@@ -81,7 +87,8 @@ async def get_overview(
     total_tokens = (
         await session.execute(
             select(func.coalesce(func.sum(Trajectory.token_count), 0)).where(
-                Trajectory.started_at >= since
+                Trajectory.started_at >= since,
+                Trajectory.org_id == user.org_id,
             )
         )
     ).scalar_one()
@@ -101,6 +108,7 @@ async def get_overview(
             ).where(
                 Trajectory.started_at >= since,
                 Trajectory.duration_ms.is_not(None),
+                Trajectory.org_id == user.org_id,
             )
         )
     ).one()
@@ -131,7 +139,10 @@ async def get_overview(
                 Trajectory.environment,
                 func.count().label("n"),
             )
-            .where(Trajectory.started_at >= vol_since)
+            .where(
+                Trajectory.started_at >= vol_since,
+                Trajectory.org_id == user.org_id,
+            )
             .group_by("hour", Trajectory.environment)
             .order_by("hour")
         )
@@ -165,7 +176,10 @@ async def get_overview(
                 func.coalesce(Trajectory.environment, "—"),
                 func.count(),
             )
-            .where(Trajectory.started_at >= since)
+            .where(
+                Trajectory.started_at >= since,
+                Trajectory.org_id == user.org_id,
+            )
             .group_by(Trajectory.environment)
             .order_by(func.count().desc())
         )
@@ -184,6 +198,7 @@ async def get_overview(
             .join(Trajectory, Trajectory.id == Span.trajectory_id)
             .where(
                 Trajectory.started_at >= since,
+                Trajectory.org_id == user.org_id,
                 Span.kind.in_(("tool", "tool_call")),
             )
             .group_by(Span.name)
@@ -203,6 +218,7 @@ async def get_overview(
             .where(
                 Trajectory.started_at >= since,
                 Trajectory.status_tag.is_not(None),
+                Trajectory.org_id == user.org_id,
             )
             .order_by(Trajectory.started_at.desc())
             .limit(10)
@@ -231,7 +247,10 @@ async def get_overview(
                 ).label("errors"),
             )
             .join(Trajectory, Trajectory.agent_id == Agent.id)
-            .where(Trajectory.started_at >= since)
+            .where(
+                Trajectory.started_at >= since,
+                Trajectory.org_id == user.org_id,
+            )
             .group_by(Agent.name)
             .order_by(func.count().desc())
             .limit(10)
