@@ -28,7 +28,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Span, Trajectory
 from app.otlp.agent_resolver import resolve_agent_and_version
-from app.otlp.attrs import derive_kind, extract_token_count
+from app.otlp.attrs import (
+    derive_kind,
+    extract_input_tokens,
+    extract_output_tokens,
+    extract_token_count,
+)
 from app.otlp.decoder import DecodedBundle, DecodedSpan
 from app.otlp.grouping import (
     resolve_environment,
@@ -188,12 +193,20 @@ async def _recompute_single(session: AsyncSession, traj_id: str) -> None:
     spans = list(result.scalars().all())
     step_count = len(spans)
     token_count = sum(extract_token_count(s.attributes) for s in spans)
+    input_tokens = sum(
+        extract_input_tokens(s.attributes) for s in spans if (s.kind or "").lower() == "llm"
+    )
+    output_tokens = sum(
+        extract_output_tokens(s.attributes) for s in spans if (s.kind or "").lower() == "llm"
+    )
 
     traj = await session.get(Trajectory, traj_id)
     if traj is None:
         return
     traj.step_count = step_count
     traj.token_count = token_count
+    traj.input_tokens = input_tokens
+    traj.output_tokens = output_tokens
     if traj.started_at and traj.ended_at:
         traj.duration_ms = int(
             (traj.ended_at - traj.started_at).total_seconds() * 1000

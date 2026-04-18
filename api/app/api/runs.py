@@ -115,6 +115,8 @@ async def list_runs(
                 duration_ms=traj.duration_ms,
                 step_count=traj.step_count,
                 token_count=traj.token_count,
+                input_tokens=traj.input_tokens,
+                output_tokens=traj.output_tokens,
                 status_tag=traj.status_tag,
                 name=traj.name,
                 environment=traj.environment,

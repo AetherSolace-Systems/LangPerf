@@ -151,22 +151,27 @@ function latencyXLabels(m: AgentMetrics | null, window: TimeWindow): string[] {
   ];
 }
 
+const COST_PER_INPUT_TOKEN_USD = 0.000003;   // ~gpt-4o-mini input; placeholder
+const COST_PER_OUTPUT_TOKEN_USD = 0.000012;  // ~gpt-4o-mini output; placeholder
+
 function tokensCostFromRuns(
-  runs: { started_at: string; token_count: number }[],
+  runs: { started_at: string; input_tokens: number; output_tokens: number }[],
 ): { label: string; input_tokens: number; output_tokens: number; cost: number }[] {
-  const buckets = new Map<string, number>();
+  const buckets = new Map<string, { input: number; output: number }>();
   for (const r of runs) {
     const day = r.started_at.slice(0, 10);
-    buckets.set(day, (buckets.get(day) ?? 0) + r.token_count);
+    const b = buckets.get(day) ?? { input: 0, output: 0 };
+    b.input += r.input_tokens ?? 0;
+    b.output += r.output_tokens ?? 0;
+    buckets.set(day, b);
   }
   return Array.from(buckets.entries())
     .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([day, total]) => {
+    .map(([day, { input, output }]) => {
       const label = new Date(day).toLocaleDateString("en-US", { weekday: "short" }).toUpperCase();
-      const input_tokens = Math.round(total * 0.8);
-      const output_tokens = total - input_tokens;
-      const cost = total * 0.00001;
-      return { label, input_tokens, output_tokens, cost };
+      const cost =
+        input * COST_PER_INPUT_TOKEN_USD + output * COST_PER_OUTPUT_TOKEN_USD;
+      return { label, input_tokens: input, output_tokens: output, cost };
     });
 }
 
@@ -414,7 +419,10 @@ export default async function AgentTab({
           </div>
 
           <div className="grid grid-cols-2 gap-[8px] mb-[10px]">
-            <Card title={`Tokens & cost · ${window}`}>
+            <Card
+              title={`Tokens & cost · ${window}`}
+              right="cost estimated @ gpt-4o-mini pricing"
+            >
               <TokensCostChart buckets={tokensCostFromRuns(runs?.items ?? [])} />
             </Card>
             <Card title={`Tools · ${window}`} right="defs →">

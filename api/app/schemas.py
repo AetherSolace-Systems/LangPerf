@@ -152,6 +152,8 @@ class AgentRunRow(BaseModel):
     duration_ms: Optional[int]
     step_count: int
     token_count: int
+    input_tokens: int = 0
+    output_tokens: int = 0
     status_tag: Optional[str]
     name: Optional[str]
     environment: Optional[str]

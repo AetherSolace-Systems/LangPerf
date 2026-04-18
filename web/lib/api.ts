@@ -172,6 +172,8 @@ export type AgentRunRow = {
   duration_ms: number | null;
   step_count: number;
   token_count: number;
+  input_tokens: number;
+  output_tokens: number;
   status_tag: string | null;
   name: string | null;
   environment: string | null;

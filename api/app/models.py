@@ -106,6 +106,8 @@ class Trajectory(Base):
     system_prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     step_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     token_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     duration_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
