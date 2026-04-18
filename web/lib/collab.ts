@@ -29,9 +29,12 @@ export type FailureMode = {
 };
 
 export async function listComments(trajectoryId: string, spanId: string, cookie?: string): Promise<Comment[]> {
+  const base = cookie ? SERVER_API_URL : CLIENT_API_URL;
   const res = await fetch(
-    `${SERVER_API_URL}/api/trajectories/${trajectoryId}/nodes/${spanId}/comments`,
-    { headers: cookie ? { cookie } : {}, cache: "no-store" },
+    `${base}/api/trajectories/${trajectoryId}/nodes/${spanId}/comments`,
+    cookie
+      ? { headers: { cookie }, cache: "no-store" }
+      : { credentials: "include", cache: "no-store" },
   );
   if (!res.ok) throw new Error(`listComments ${res.status}`);
   return res.json();
@@ -60,8 +63,14 @@ export async function resolveComment(commentId: string): Promise<Comment> {
 }
 
 export async function listNotifications(unreadOnly = false, cookie?: string): Promise<Notification[]> {
-  const url = `${SERVER_API_URL}/api/notifications${unreadOnly ? "?unread_only=true" : ""}`;
-  const res = await fetch(url, { headers: cookie ? { cookie } : {}, cache: "no-store" });
+  const base = cookie ? SERVER_API_URL : CLIENT_API_URL;
+  const url = `${base}/api/notifications${unreadOnly ? "?unread_only=true" : ""}`;
+  const res = await fetch(
+    url,
+    cookie
+      ? { headers: { cookie }, cache: "no-store" }
+      : { credentials: "include", cache: "no-store" },
+  );
   return res.json();
 }
 
@@ -73,9 +82,12 @@ export async function markNotificationRead(id: string): Promise<void> {
 }
 
 export async function listFailureModes(cookie?: string): Promise<FailureMode[]> {
-  const res = await fetch(`${SERVER_API_URL}/api/failure-modes`, {
-    headers: cookie ? { cookie } : {}, cache: "no-store",
-  });
+  const base = cookie ? SERVER_API_URL : CLIENT_API_URL;
+  const res = await fetch(`${base}/api/failure-modes`,
+    cookie
+      ? { headers: { cookie }, cache: "no-store" }
+      : { credentials: "include", cache: "no-store" },
+  );
   return res.json();
 }
 
