@@ -1,6 +1,9 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTrajectory } from "@/lib/api";
 import { TrajectoryView } from "@/components/trajectory-view";
+import { AppShell } from "@/components/shell/app-shell";
+import { Chip } from "@/components/ui/chip";
 
 export const dynamic = "force-dynamic";
 
@@ -18,5 +21,40 @@ export default async function TrajectoryPage({
     throw err;
   }
 
-  return <TrajectoryView trajectory={traj} />;
+  const serviceLabel = traj.service_name;
+  const envLabel = traj.environment ?? "—";
+
+  const breadcrumb = (
+    <>
+      <Link href="/history" className="hover:text-warm-fog">History</Link>
+      <span className="mx-[6px] text-[color:var(--border-strong)]">›</span>
+      <span className="font-mono text-[11px] text-warm-fog">{id.slice(0, 8)}</span>
+    </>
+  );
+
+  return (
+    <AppShell
+      topBar={{
+        breadcrumb,
+        right: <Chip>env: {envLabel}</Chip>,
+      }}
+    >
+      {/* Identity strip — Phase 1 fills it from service_name/environment since
+          Agents aren't first-class yet. Phase 2 swaps to real agent+version. */}
+      <div className="flex items-center gap-2 px-[14px] py-[9px] -mx-[14px] -mt-[14px] mb-[14px] border-b border-[color:var(--border)] bg-gradient-to-b from-[color:var(--surface-2)] to-[color:var(--background)]">
+        <span className="font-mono text-[9px] text-patina uppercase tracking-[0.1em] mr-[2px]">Service</span>
+        <Chip>{serviceLabel}</Chip>
+        <span className="font-mono text-[9px] text-patina uppercase tracking-[0.1em] mx-[2px] ml-[6px]">Env</span>
+        <Chip>{envLabel}</Chip>
+        <span className="font-mono text-[9px] text-patina uppercase tracking-[0.1em] mx-[2px] ml-[6px]">Run</span>
+        <Chip>{id.slice(0, 8)}</Chip>
+        <div className="flex-1" />
+        <span className="font-mono text-[10px] text-patina">
+          {traj.step_count} steps · {traj.token_count.toLocaleString()}t
+        </span>
+      </div>
+
+      <TrajectoryView trajectory={traj} />
+    </AppShell>
+  );
 }

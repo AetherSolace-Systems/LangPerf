@@ -15,20 +15,36 @@
  *     the whole app in lockstep with tailwind.config.ts and globals.css.
  */
 
-export const DRIFT = {
-  midnight: "#14141F",       // Page background
-  deepIndigo: "#1F2035",      // Cards / surfaces
-  driftViolet: "#8B8CC7",     // Primary accent
-  marigold: "#E5B754",        // Secondary accent
-  linen: "#EDE7DD",           // Text
-  twilight: "#6E6F88",        // Muted text
+/**
+ * Aether Dusk palette. `DRIFT` export retained as an alias so existing
+ * imports continue to work; prefer `AETHER` in new code.
+ */
+export const AETHER = {
+  carbon: "#181D21",           // Page background (was DRIFT.midnight)
+  steelMist: "#242D32",        // Cards / surfaces (was DRIFT.deepIndigo)
+  surface2: "#1F272B",         // Secondary surface (rail, identity strip)
+  aetherTeal: "#6BBAB1",       // Primary accent (was DRIFT.driftViolet)
+  peachNeon: "#E8A87C",        // Secondary accent (was DRIFT.marigold)
+  warmFog: "#F2EAE2",          // Text (was DRIFT.linen)
+  patina: "#7A8B8E",           // Muted text (was DRIFT.twilight)
+  warn: "#D98A6A",             // Errors / bad tags
+} as const;
 
-  // Extended hues — derived for node-kind differentiation while staying
-  // tonally coherent with the primary palette.
-  lagoon: "#5BB6C7",          // cool teal (agents)
-  plum: "#C78BAD",            // warm mauve (reasoning / retriever)
-  coral: "#E58B54",           // warm red-orange (errors / bad)
-  sage: "#7BC89D",            // soft green (good / embedding)
+export const DRIFT = {
+  // Legacy alias — values repointed to Aether Dusk so existing imports adopt
+  // the new palette without rewiring. Prefer AETHER in new code.
+  midnight: AETHER.carbon,
+  deepIndigo: AETHER.steelMist,
+  driftViolet: AETHER.aetherTeal,
+  marigold: AETHER.peachNeon,
+  linen: AETHER.warmFog,
+  twilight: AETHER.patina,
+
+  // Extended hues collapsed into the reduced Aether Dusk palette.
+  lagoon: AETHER.aetherTeal,
+  plum: AETHER.peachNeon,
+  coral: AETHER.warn,
+  sage: AETHER.aetherTeal,
 } as const;
 
 function rgba(hex: string, alpha: number): string {
@@ -97,7 +113,7 @@ export function tagSwatch(tag: string | null): Swatch {
 }
 
 export const GRADIENT =
-  "linear-gradient(135deg, #14141F 0%, #1F2035 30%, #8B8CC7 60%, #E5B754 100%)";
+  "linear-gradient(135deg, #181D21 0%, #242D32 25%, #6BBAB1 60%, #E8A87C 100%)";
 
 /**
  * Glyph + label per kind, co-located with the color swatches above. When

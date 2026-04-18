@@ -20,14 +20,20 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Iterable
+from typing import Any, Iterable, Optional
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Span, Trajectory
-from app.otlp.attrs import derive_kind, extract_token_count
+from app.otlp.agent_resolver import resolve_agent_and_version
+from app.otlp.attrs import (
+    derive_kind,
+    extract_input_tokens,
+    extract_output_tokens,
+    extract_token_count,
+)
 from app.otlp.decoder import DecodedBundle, DecodedSpan
 from app.otlp.grouping import (
     resolve_environment,
@@ -130,6 +136,9 @@ async def _upsert_trajectory_for_span(
     service_name = resolve_service_name(resource_attrs)
     environment = resolve_environment(resource_attrs)
     name = resolve_trajectory_name(span, resource_attrs)
+    agent_id, agent_version_id = await resolve_agent_and_version(
+        session, resource_attrs
+    )
 
     values: dict[str, Any] = {
         "id": traj_id,
@@ -142,15 +151,14 @@ async def _upsert_trajectory_for_span(
         "step_count": 0,
         "token_count": 0,
         "duration_ms": None,
+        "agent_id": agent_id,
+        "agent_version_id": agent_version_id,
     }
 
-    # Do-nothing on conflict at insert; we widen the window via UPDATE below.
     stmt = pg_insert(Trajectory).values(**values)
     stmt = stmt.on_conflict_do_nothing(index_elements=[Trajectory.id])
     await session.execute(stmt)
 
-    # For an existing row, widen started_at downward, ended_at upward, and
-    # fill in name/environment if they weren't known before.
     existing = await session.get(Trajectory, traj_id)
     if existing:
         changed = False
@@ -168,6 +176,12 @@ async def _upsert_trajectory_for_span(
         if environment and not existing.environment:
             existing.environment = environment
             changed = True
+        if agent_id and not existing.agent_id:
+            existing.agent_id = agent_id
+            changed = True
+        if agent_version_id and not existing.agent_version_id:
+            existing.agent_version_id = agent_version_id
+            changed = True
         if changed:
             session.add(existing)
 
@@ -179,16 +193,26 @@ async def _recompute_single(session: AsyncSession, traj_id: str) -> None:
     spans = list(result.scalars().all())
     step_count = len(spans)
     token_count = sum(extract_token_count(s.attributes) for s in spans)
+    input_tokens = sum(
+        extract_input_tokens(s.attributes) for s in spans if (s.kind or "").lower() == "llm"
+    )
+    output_tokens = sum(
+        extract_output_tokens(s.attributes) for s in spans if (s.kind or "").lower() == "llm"
+    )
 
     traj = await session.get(Trajectory, traj_id)
     if traj is None:
         return
     traj.step_count = step_count
     traj.token_count = token_count
+    traj.input_tokens = input_tokens
+    traj.output_tokens = output_tokens
     if traj.started_at and traj.ended_at:
         traj.duration_ms = int(
             (traj.ended_at - traj.started_at).total_seconds() * 1000
         )
+    if not traj.system_prompt:
+        traj.system_prompt = _extract_system_prompt(spans)
     session.add(traj)
     logger.debug(
         "recompute_totals traj=%s steps=%d tokens=%d duration=%sms",
@@ -201,3 +225,27 @@ async def _recompute_single(session: AsyncSession, traj_id: str) -> None:
 
 def _unix_nano_to_dt(unix_nano: int) -> datetime:
     return datetime.fromtimestamp(unix_nano / 1_000_000_000, tz=timezone.utc)
+
+
+_MAX_PROMPT_LEN = 16_384
+
+
+def _extract_system_prompt(spans: list[Span]) -> Optional[str]:
+    """Return the system prompt from the earliest LLM span that carries one.
+
+    OpenInference flattens messages into `llm.input_messages.<i>.message.role`
+    and `.content`. The system message is conventionally index 0, but some
+    frameworks put it elsewhere — scan all indices up to 8 to be safe.
+    """
+    llm_spans = [s for s in spans if (s.kind or "").lower() == "llm"]
+    llm_spans.sort(key=lambda s: s.started_at)
+    for span in llm_spans:
+        attrs = span.attributes or {}
+        for i in range(8):
+            role = attrs.get(f"llm.input_messages.{i}.message.role")
+            if role == "system":
+                content = attrs.get(f"llm.input_messages.{i}.message.content")
+                if isinstance(content, str) and content.strip():
+                    return content[:_MAX_PROMPT_LEN]
+                break
+    return None

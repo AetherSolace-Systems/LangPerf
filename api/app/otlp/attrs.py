@@ -25,22 +25,36 @@ def _as_int(v: Any) -> Optional[int]:
         return None
 
 
+def extract_input_tokens(attrs: dict[str, Any]) -> int:
+    """Input (prompt) tokens for a span, or 0 when the attribute is missing."""
+    return next(
+        (
+            n
+            for key in ("llm.token_count.prompt", "gen_ai.usage.input_tokens")
+            if (n := _as_int(attrs.get(key))) is not None
+        ),
+        0,
+    )
+
+
+def extract_output_tokens(attrs: dict[str, Any]) -> int:
+    """Output (completion) tokens for a span, or 0 when missing."""
+    return next(
+        (
+            n
+            for key in ("llm.token_count.completion", "gen_ai.usage.output_tokens")
+            if (n := _as_int(attrs.get(key))) is not None
+        ),
+        0,
+    )
+
+
 def extract_token_count(attrs: dict[str, Any]) -> int:
     """Total tokens for a span, summing input + output if no total is provided."""
     for key in ("llm.token_count.total", "gen_ai.usage.total_tokens"):
         if (n := _as_int(attrs.get(key))) is not None:
             return n
-    input_tok = next(
-        (n for key in ("llm.token_count.prompt", "gen_ai.usage.input_tokens")
-         if (n := _as_int(attrs.get(key))) is not None),
-        0,
-    )
-    output_tok = next(
-        (n for key in ("llm.token_count.completion", "gen_ai.usage.output_tokens")
-         if (n := _as_int(attrs.get(key))) is not None),
-        0,
-    )
-    return input_tok + output_tok
+    return extract_input_tokens(attrs) + extract_output_tokens(attrs)
 
 
 def derive_kind(attrs: dict[str, Any], span_name: str) -> Optional[str]:
