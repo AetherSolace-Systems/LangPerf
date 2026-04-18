@@ -1,4 +1,3 @@
-import asyncio
 import os
 from collections.abc import AsyncGenerator
 
@@ -12,13 +11,6 @@ os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 from app import db as db_module  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import Base  # noqa: E402
-
-
-@pytest.fixture(scope="session")
-def event_loop():
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
 
 
 @pytest_asyncio.fixture
