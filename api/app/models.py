@@ -13,6 +13,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    JSON,
     String,
     Text,
     UniqueConstraint,
@@ -20,6 +21,11 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+# Dialect-agnostic variants: use Postgres-native types on Postgres,
+# fall back to portable types on other dialects (e.g. sqlite in tests).
+JsonB = JSON().with_variant(JSONB(), "postgresql")
+UUIDStr = String(36).with_variant(UUID(as_uuid=False), "postgresql")
 
 
 class Base(DeclarativeBase):
@@ -29,7 +35,7 @@ class Base(DeclarativeBase):
 class Agent(Base):
     __tablename__ = "agents"
 
-    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    id: Mapped[str] = mapped_column(UUIDStr, primary_key=True)
     signature: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
     name: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
     display_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
@@ -57,9 +63,9 @@ class Agent(Base):
 class AgentVersion(Base):
     __tablename__ = "agent_versions"
 
-    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    id: Mapped[str] = mapped_column(UUIDStr, primary_key=True)
     agent_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False),
+        UUIDStr,
         ForeignKey("agents.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -90,7 +96,7 @@ class AgentVersion(Base):
 class Trajectory(Base):
     __tablename__ = "trajectories"
 
-    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    id: Mapped[str] = mapped_column(UUIDStr, primary_key=True)
     trace_id: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
     service_name: Mapped[str] = mapped_column(String, nullable=False, index=True)
     environment: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
@@ -114,13 +120,13 @@ class Trajectory(Base):
     )
     # New in Phase 2a — populated by ingest; nullable so legacy rows exist until backfill runs.
     agent_id: Mapped[Optional[str]] = mapped_column(
-        UUID(as_uuid=False),
+        UUIDStr,
         ForeignKey("agents.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
     agent_version_id: Mapped[Optional[str]] = mapped_column(
-        UUID(as_uuid=False),
+        UUIDStr,
         ForeignKey("agent_versions.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
@@ -141,7 +147,7 @@ class WorkspaceSetting(Base):
     __tablename__ = "workspace_settings"
 
     key: Mapped[str] = mapped_column(String, primary_key=True)
-    value: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    value: Mapped[dict[str, Any]] = mapped_column(JsonB, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -156,7 +162,7 @@ class Span(Base):
     span_id: Mapped[str] = mapped_column(String, primary_key=True)
     trace_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
     trajectory_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False),
+        UUIDStr,
         ForeignKey("trajectories.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -171,8 +177,8 @@ class Span(Base):
         DateTime(timezone=True), nullable=True
     )
     duration_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    attributes: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
-    events: Mapped[Optional[list[Any]]] = mapped_column(JSONB, nullable=True)
+    attributes: Mapped[dict[str, Any]] = mapped_column(JsonB, nullable=False)
+    events: Mapped[Optional[list[Any]]] = mapped_column(JsonB, nullable=True)
     status_code: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
