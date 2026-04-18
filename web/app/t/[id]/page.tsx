@@ -3,10 +3,12 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { getTrajectory } from "@/lib/api";
 import { fetchTrajectoryHits } from "@/lib/triage";
+import { listRewrites } from "@/lib/rewrites";
 import { TrajectoryView } from "@/components/trajectory-view";
 import { AppShell } from "@/components/shell/app-shell";
 import { ContextSidebar } from "@/components/shell/context-sidebar";
 import { HeuristicHitsPanel } from "@/components/queue/heuristic-hits-panel";
+import { RewriteList } from "@/components/rewrite/rewrite-list";
 import { Chip } from "@/components/ui/chip";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +32,12 @@ export default async function TrajectoryPage({
     hits = await fetchTrajectoryHits(id, cookie);
   } catch {
     // hits are best-effort; don't crash the page if triage API is absent
+  }
+  let rewrites: import("@/lib/rewrites").Rewrite[] = [];
+  try {
+    rewrites = await listRewrites(id, cookie);
+  } catch {
+    // rewrites are best-effort; don't crash the page if the endpoint is absent
   }
 
   const serviceLabel = traj.service_name;
@@ -73,6 +81,13 @@ export default async function TrajectoryPage({
       </div>
 
       <TrajectoryView trajectory={traj} />
+
+      <section className="mt-8 space-y-3">
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-aether-teal">
+          Rewrites
+        </h2>
+        <RewriteList rewrites={rewrites} />
+      </section>
     </AppShell>
   );
 }

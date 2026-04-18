@@ -321,3 +321,18 @@ class HeuristicHit(Base):
     signature: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     details: Mapped[dict] = mapped_column(JsonB, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class Rewrite(Base):
+    __tablename__ = "rewrites"
+
+    id: Mapped[str] = mapped_column(UUIDStr, primary_key=True, default=lambda: str(uuid.uuid4()))
+    org_id: Mapped[str] = mapped_column(UUIDStr, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    trajectory_id: Mapped[str] = mapped_column(UUIDStr, ForeignKey("trajectories.id", ondelete="CASCADE"), nullable=False, index=True)
+    branch_span_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    author_id: Mapped[str] = mapped_column(UUIDStr, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    proposed_steps: Mapped[list[dict]] = mapped_column(JsonB, nullable=False, default=list)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="draft")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
