@@ -100,6 +100,14 @@ class Agent(Base):
         onupdate=func.now(),
         nullable=False,
     )
+    token_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    token_prefix: Mapped[str | None] = mapped_column(String(24), nullable=True, unique=True, index=True)
+    last_token_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by_user_id: Mapped[str | None] = mapped_column(
+        UUIDStr,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     versions: Mapped[list["AgentVersion"]] = relationship(
         back_populates="agent",
