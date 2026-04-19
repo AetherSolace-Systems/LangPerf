@@ -129,6 +129,13 @@ export async function getFacets(): Promise<FacetsResponse> {
 
 // ── Agents (Phase 2b) ─────────────────────────────────────────────────
 
+export type ProjectRef = {
+  id: string;
+  slug: string;
+  name: string;
+  color: string | null;
+};
+
 export type AgentMiniMetrics = {
   runs: number;
   error_rate: number;
@@ -147,6 +154,7 @@ export type AgentSummary = {
   last_token_used_at: string | null;
   created_at: string;
   updated_at: string;
+  project: ProjectRef | null;
 };
 
 export type AgentSummaryWithMetrics = AgentSummary & {

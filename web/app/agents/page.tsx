@@ -2,13 +2,26 @@ import { AppShell } from "@/components/shell/app-shell";
 import { AgentsTable } from "@/components/agents/agents-table";
 import { Chip } from "@/components/ui/chip";
 import { listAgents, type AgentSummary } from "@/lib/api";
+import { listProjects, type Project } from "@/lib/projects";
+import { ProjectFilter } from "@/components/projects/project-filter";
 
 export const dynamic = "force-dynamic";
 
-export default async function AgentsPage() {
+export default async function AgentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ project?: string }>;
+}) {
+  const params = await searchParams;
+  const selectedProject = params.project ?? null;
+
   let agents: AgentSummary[];
+  let projects: Project[];
   try {
-    agents = (await listAgents()) as AgentSummary[];
+    [agents, projects] = await Promise.all([
+      listAgents().then((a) => a as AgentSummary[]),
+      listProjects(),
+    ]);
   } catch (err) {
     return (
       <AppShell
@@ -43,7 +56,8 @@ export default async function AgentsPage() {
         ),
       }}
     >
-      <AgentsTable agents={agents} />
+      <ProjectFilter projects={projects} />
+      <AgentsTable agents={agents} projects={projects} selectedProject={selectedProject} />
     </AppShell>
   );
 }

@@ -5,10 +5,27 @@ import Link from "next/link";
 import { NewAgentModal } from "./new-agent-modal";
 import { RowActions } from "./row-actions";
 import type { AgentSummary } from "@/lib/api";
+import type { Project } from "@/lib/projects";
 
-type Col = "name" | "language" | "token" | "last_used" | "created";
+type Col = "name" | "language" | "token" | "last_used" | "created" | "project";
 
-export function AgentsTable({ agents }: { agents: AgentSummary[] }) {
+// Deterministic ISO-ish formatters — avoid toLocale* which diverges between
+// server (container UTC) and client (user locale), triggering hydration errors.
+const fmtDate = (iso: string) => new Date(iso).toISOString().slice(0, 10);
+const fmtDateTime = (iso: string) => {
+  const s = new Date(iso).toISOString();
+  return `${s.slice(0, 10)} ${s.slice(11, 16)}Z`;
+};
+
+export function AgentsTable({
+  agents,
+  projects,
+  selectedProject,
+}: {
+  agents: AgentSummary[];
+  projects: Project[];
+  selectedProject: string | null;
+}) {
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<{ col: Col; dir: "asc" | "desc" }>({
     col: "name",
@@ -18,7 +35,11 @@ export function AgentsTable({ agents }: { agents: AgentSummary[] }) {
 
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase();
-    const arr = agents.filter(
+    let arr = agents;
+    if (selectedProject) {
+      arr = arr.filter((a) => a.project?.slug === selectedProject);
+    }
+    arr = arr.filter(
       (a) =>
         !q ||
         a.name.toLowerCase().includes(q) ||
@@ -45,11 +66,13 @@ export function AgentsTable({ agents }: { agents: AgentSummary[] }) {
             new Date(x.created_at).getTime() -
             new Date(y.created_at).getTime()
           );
+        case "project":
+          return (x.project?.slug ?? "").localeCompare(y.project?.slug ?? "");
       }
     };
     arr.sort((a, b) => (sort.dir === "asc" ? cmp(a, b) : -cmp(a, b)));
     return arr;
-  }, [agents, filter, sort]);
+  }, [agents, filter, sort, selectedProject]);
 
   function toggleSort(col: Col) {
     setSort((s) =>
@@ -88,6 +111,12 @@ export function AgentsTable({ agents }: { agents: AgentSummary[] }) {
                 dir={sort.dir}
               />
               <Th
+                label="Project"
+                onClick={() => toggleSort("project")}
+                active={sort.col === "project"}
+                dir={sort.dir}
+              />
+              <Th
                 label="Lang"
                 onClick={() => toggleSort("language")}
                 active={sort.col === "language"}
@@ -118,7 +147,7 @@ export function AgentsTable({ agents }: { agents: AgentSummary[] }) {
             {visible.length === 0 ? (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className="p-6 text-center text-warm-fog/50"
                 >
                   No agents yet. Click &quot;+ Add agent&quot; to register one.
@@ -144,6 +173,14 @@ export function AgentsTable({ agents }: { agents: AgentSummary[] }) {
                     )}
                   </td>
                   <td className="px-3 py-2 text-warm-fog/70">
+                    {a.project ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <span style={{ background: "var(--accent)", width: 6, height: 6, borderRadius: 999 }} />
+                        <span>{a.project.name}</span>
+                      </span>
+                    ) : "—"}
+                  </td>
+                  <td className="px-3 py-2 text-warm-fog/70">
                     {a.language ?? "—"}
                   </td>
                   <td className="px-3 py-2">
@@ -157,13 +194,11 @@ export function AgentsTable({ agents }: { agents: AgentSummary[] }) {
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-warm-fog/70">
-                    {a.last_token_used_at
-                      ? new Date(a.last_token_used_at).toLocaleString()
-                      : "—"}
+                  <td className="px-3 py-2 font-mono text-[11px] text-warm-fog/70">
+                    {a.last_token_used_at ? fmtDateTime(a.last_token_used_at) : "—"}
                   </td>
-                  <td className="px-3 py-2 text-warm-fog/70">
-                    {new Date(a.created_at).toLocaleDateString()}
+                  <td className="px-3 py-2 font-mono text-[11px] text-warm-fog/70">
+                    {fmtDate(a.created_at)}
                   </td>
                   <td className="px-3 py-2 text-right">
                     <RowActions
@@ -178,7 +213,13 @@ export function AgentsTable({ agents }: { agents: AgentSummary[] }) {
         </table>
       </div>
 
-      {showModal && <NewAgentModal onClose={() => setShowModal(false)} />}
+      {showModal && (
+        <NewAgentModal
+          onClose={() => setShowModal(false)}
+          projects={projects}
+          defaultProjectSlug={selectedProject ?? "default"}
+        />
+      )}
     </>
   );
 }

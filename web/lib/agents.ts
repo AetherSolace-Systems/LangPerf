@@ -6,6 +6,7 @@ export type CreateAgentPayload = {
   description?: string;
   language?: string;
   github_url?: string;
+  project_slug?: string;
 };
 
 export async function createAgent(
