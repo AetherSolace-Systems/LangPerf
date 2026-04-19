@@ -46,8 +46,10 @@ def init(
 
     Env vars:
         LANGPERF_ENDPOINT       default: http://localhost:4318
-        LANGPERF_SERVICE_NAME   default: "langperf-agent" (deprecated; use agent_name)
+        LANGPERF_AGENT_NAME     default: "langperf-agent"
+        LANGPERF_SERVICE_NAME   deprecated alias for LANGPERF_AGENT_NAME
         LANGPERF_ENVIRONMENT    default: (unset)
+        LANGPERF_VERSION        default: (unset)
         LANGPERF_API_TOKEN      required — per-agent bearer token minted in
                                 the UI when you register the agent.
     """
@@ -67,7 +69,13 @@ def init(
         )
 
     endpoint = endpoint or os.environ.get("LANGPERF_ENDPOINT", "http://localhost:4318")
-    agent_name = agent_name or os.environ.get("LANGPERF_SERVICE_NAME", "langperf-agent")
+    # Prefer LANGPERF_AGENT_NAME; fall back to the deprecated LANGPERF_SERVICE_NAME.
+    agent_name = (
+        agent_name
+        or os.environ.get("LANGPERF_AGENT_NAME")
+        or os.environ.get("LANGPERF_SERVICE_NAME")
+        or "langperf-agent"
+    )
     environment = environment or os.environ.get("LANGPERF_ENVIRONMENT")
     version = version or os.environ.get("LANGPERF_VERSION")
     token = api_token or os.environ.get("LANGPERF_API_TOKEN")
