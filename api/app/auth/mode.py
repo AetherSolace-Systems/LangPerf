@@ -1,5 +1,10 @@
-import os
-from dataclasses import dataclass
+"""Deployment-mode helpers.
+
+`is_single_user_mode` returns True when no users exist yet — the UI uses
+this to show a "create first admin" bootstrap form. Once any user exists
+it flips to "multi_user" and the login form takes over. There is no
+synthetic auto-login — every request requires a real admin session.
+"""
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,29 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import User
 
 
-@dataclass(frozen=True)
-class SyntheticUser:
-    id: str
-    org_id: str
-    email: str
-    display_name: str
-    is_admin: bool
-
-
-DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001"
-DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000002"
-DEFAULT_SINGLE_USER = SyntheticUser(
-    id=DEFAULT_USER_ID,
-    org_id=DEFAULT_ORG_ID,
-    email="single-user@localhost",
-    display_name="Single User",
-    is_admin=True,
-)
-
-
 async def is_single_user_mode(db: AsyncSession) -> bool:
-    if os.environ.get("LANGPERF_SINGLE_USER") == "1":
-        return True
     result = await db.execute(select(func.count(User.id)))
     count = result.scalar_one()
     return count == 0

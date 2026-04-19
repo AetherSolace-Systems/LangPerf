@@ -28,14 +28,6 @@ def _app_with_deps(session_factory):
 
 
 async def test_require_user_401_without_cookie(session_factory):
-    # Seed a real user so we're in multi-user mode (otherwise single-user mode
-    # returns the synthetic user even without a cookie).
-    async with session_factory() as s:
-        org = Organization(name="default", slug="default")
-        s.add(org); await s.flush()
-        s.add(User(org_id=org.id, email="seed@seed", password_hash="x", display_name="Seed"))
-        await s.commit()
-
     app = _app_with_deps(session_factory)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
         r = await c.get("/optional")
@@ -62,9 +54,9 @@ async def test_require_user_succeeds_with_cookie(session_factory):
         assert r.json()["email"] == "a@b"
 
 
-async def test_maybe_returns_synthetic_user_in_single_user_mode(session_factory):
+async def test_maybe_returns_none_without_cookie(session_factory):
     app = _app_with_deps(session_factory)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
         r = await c.get("/maybe")
         assert r.status_code == 200
-        assert r.json()["email"] == "single-user@localhost"
+        assert r.json()["email"] is None

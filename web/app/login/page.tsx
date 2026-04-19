@@ -9,17 +9,22 @@ export const dynamic = "force-dynamic";
 export default async function LoginPage() {
   const cookie = headers().get("cookie") ?? undefined;
   const [mode, me] = await Promise.all([fetchMode(), fetchMe(cookie)]);
-  if (mode === "single_user" || me) redirect("/");
+  if (me) redirect("/");
 
-  const hasAnyUser = mode === "multi_user";
+  const bootstrap = mode === "single_user";
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-carbon px-4">
       <div className="w-full max-w-sm rounded-2xl bg-warm-fog/5 p-6 shadow-xl ring-1 ring-aether-teal/20">
-        <h1 className="mb-4 text-xl font-semibold text-aether-teal">
-          {hasAnyUser ? "Sign in to LangPerf" : "Set up LangPerf"}
+        <h1 className="mb-1 text-xl font-semibold text-aether-teal">
+          {bootstrap ? "Set up LangPerf" : "Sign in to LangPerf"}
         </h1>
-        <LoginForm bootstrap={!hasAnyUser} />
+        {bootstrap && (
+          <p className="mb-4 text-xs text-steel-mist">
+            Create the first admin account for this deployment.
+          </p>
+        )}
+        <LoginForm bootstrap={bootstrap} />
       </div>
     </main>
   );
