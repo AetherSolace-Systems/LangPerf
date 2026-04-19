@@ -24,6 +24,7 @@ export function LogForwardingForm({ initial }: { initial: LogForwardingConfig })
     try {
       const resp = await fetch(`${CLIENT_API_URL}/api/settings/log-forwarding`, {
         method: "PUT",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(cfg),
       });

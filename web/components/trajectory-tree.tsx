@@ -77,6 +77,15 @@ function TreeRow({ node }: { node: TreeNode }) {
         <span className="text-[10px] text-twilight tabular-nums w-12 text-right">
           {fmtDuration(node.span.duration_ms)}
         </span>
+        {node.span.notes ? (
+          <span
+            className="text-[10px] text-aether-teal"
+            title={node.span.notes}
+            aria-label="has note"
+          >
+            ●
+          </span>
+        ) : null}
         {node.span.status_code === "ERROR" ? (
           <span className="text-[10px] text-coral">!</span>
         ) : null}

@@ -23,6 +23,7 @@ export async function patchTrajectory(
   };
   const resp = await fetch(`${BASE}/api/trajectories/${id}`, {
     method: "PATCH",
+    credentials: "include",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
@@ -40,6 +41,7 @@ export async function patchNode(
   };
   const resp = await fetch(`${BASE}/api/nodes/${spanId}`, {
     method: "PATCH",
+    credentials: "include",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });

@@ -1,4 +1,4 @@
-import { CLIENT_API_URL, SERVER_API_URL } from "./api";
+import { apiBase, CLIENT_API_URL } from "./api";
 
 export type ProposedStep =
   | { kind: "tool_call"; tool_name: string; arguments: Record<string, unknown>; reasoning?: string }
@@ -18,7 +18,7 @@ export type Rewrite = {
 };
 
 export async function listRewrites(trajectoryId: string, cookie?: string): Promise<Rewrite[]> {
-  const base = cookie ? SERVER_API_URL : CLIENT_API_URL;
+  const base = apiBase();
   const res = await fetch(
     `${base}/api/trajectories/${trajectoryId}/rewrites`,
     cookie ? { headers: { cookie }, cache: "no-store" } : { credentials: "include", cache: "no-store" },

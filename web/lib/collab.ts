@@ -1,4 +1,4 @@
-import { CLIENT_API_URL, SERVER_API_URL } from "./api";
+import { apiBase, CLIENT_API_URL } from "./api";
 
 export type Comment = {
   id: string;
@@ -29,7 +29,7 @@ export type FailureMode = {
 };
 
 export async function listComments(trajectoryId: string, spanId: string, cookie?: string): Promise<Comment[]> {
-  const base = cookie ? SERVER_API_URL : CLIENT_API_URL;
+  const base = apiBase();
   const res = await fetch(
     `${base}/api/trajectories/${trajectoryId}/nodes/${spanId}/comments`,
     cookie
@@ -63,7 +63,7 @@ export async function resolveComment(commentId: string): Promise<Comment> {
 }
 
 export async function listNotifications(unreadOnly = false, cookie?: string): Promise<Notification[]> {
-  const base = cookie ? SERVER_API_URL : CLIENT_API_URL;
+  const base = apiBase();
   const url = `${base}/api/notifications${unreadOnly ? "?unread_only=true" : ""}`;
   const res = await fetch(
     url,
@@ -82,7 +82,7 @@ export async function markNotificationRead(id: string): Promise<void> {
 }
 
 export async function listFailureModes(cookie?: string): Promise<FailureMode[]> {
-  const base = cookie ? SERVER_API_URL : CLIENT_API_URL;
+  const base = apiBase();
   const res = await fetch(`${base}/api/failure-modes`,
     cookie
       ? { headers: { cookie }, cache: "no-store" }

@@ -1,4 +1,4 @@
-import { CLIENT_API_URL, SERVER_API_URL } from "./api";
+import { apiBase } from "./api";
 
 export type HeuristicHit = {
   heuristic: string;
@@ -33,7 +33,7 @@ export async function fetchQueue(
   const qs = new URLSearchParams();
   (params.heuristic ?? []).forEach((h) => qs.append("heuristic", h));
   if (params.assigned_to_me) qs.set("assigned_to_me", "true");
-  const base = cookie ? SERVER_API_URL : CLIENT_API_URL;
+  const base = apiBase();
   const res = await fetch(
     `${base}/api/queue?${qs}`,
     cookie ? { headers: { cookie }, cache: "no-store" } : { credentials: "include", cache: "no-store" },
@@ -42,7 +42,7 @@ export async function fetchQueue(
 }
 
 export async function fetchClusters(cookie?: string): Promise<{ clusters: Cluster[] }> {
-  const base = cookie ? SERVER_API_URL : CLIENT_API_URL;
+  const base = apiBase();
   const res = await fetch(
     `${base}/api/clusters`,
     cookie ? { headers: { cookie }, cache: "no-store" } : { credentials: "include", cache: "no-store" },
@@ -51,7 +51,7 @@ export async function fetchClusters(cookie?: string): Promise<{ clusters: Cluste
 }
 
 export async function fetchTrajectoryHits(trajectoryId: string, cookie?: string): Promise<HeuristicHit[]> {
-  const base = cookie ? SERVER_API_URL : CLIENT_API_URL;
+  const base = apiBase();
   const res = await fetch(
     `${base}/api/queue/${trajectoryId}/hits`,
     cookie ? { headers: { cookie }, cache: "no-store" } : { credentials: "include", cache: "no-store" },
