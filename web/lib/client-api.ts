@@ -1,10 +1,10 @@
 "use client";
 
-// Client-side API helpers for PATCH actions. Uses NEXT_PUBLIC_LANGPERF_API_URL
-// because these run in the browser, not the Next.js server.
+// Client-side API helpers for PATCH actions. Uses the shared apiFetch, which
+// resolves to CLIENT_API_URL + credentials: "include" when running in the
+// browser.
 
-const BASE =
-  process.env.NEXT_PUBLIC_LANGPERF_API_URL ?? "http://localhost:4318";
+import { apiFetch } from "./fetch-utils";
 
 export async function patchTrajectory(
   id: string,
@@ -21,14 +21,10 @@ export async function patchTrajectory(
     clear_tag: !!patch.clear_tag,
     clear_notes: !!patch.clear_notes,
   };
-  const resp = await fetch(`${BASE}/api/trajectories/${id}`, {
+  return apiFetch<unknown>(`/api/trajectories/${id}`, {
     method: "PATCH",
-    credentials: "include",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
+    body,
   });
-  if (!resp.ok) throw new Error(`patch trajectory ${resp.status}`);
-  return resp.json();
 }
 
 export async function patchNode(
@@ -39,12 +35,8 @@ export async function patchNode(
     notes: patch.notes ?? null,
     clear_notes: !!patch.clear_notes,
   };
-  const resp = await fetch(`${BASE}/api/nodes/${spanId}`, {
+  return apiFetch<unknown>(`/api/nodes/${spanId}`, {
     method: "PATCH",
-    credentials: "include",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
+    body,
   });
-  if (!resp.ok) throw new Error(`patch node ${resp.status}`);
-  return resp.json();
 }

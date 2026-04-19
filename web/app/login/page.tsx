@@ -1,4 +1,3 @@
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { fetchMode, fetchMe } from "@/lib/auth";
@@ -7,8 +6,7 @@ import { LoginForm } from "@/components/auth/login-form";
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
-  const cookie = headers().get("cookie") ?? undefined;
-  const [mode, me] = await Promise.all([fetchMode(), fetchMe(cookie)]);
+  const [mode, me] = await Promise.all([fetchMode(), fetchMe()]);
   if (me) redirect("/");
 
   const bootstrap = mode === "single_user";

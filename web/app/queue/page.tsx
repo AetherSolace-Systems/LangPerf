@@ -1,5 +1,3 @@
-import { headers } from "next/headers";
-
 import { AppShell } from "@/components/shell/app-shell";
 import { Chip } from "@/components/ui/chip";
 import { FilterBar } from "@/components/queue/filter-bar";
@@ -13,13 +11,12 @@ export default async function QueuePage({
 }: {
   searchParams: { heuristic?: string | string[] };
 }) {
-  const cookie = headers().get("cookie") ?? "";
   const heuristic = searchParams.heuristic
     ? Array.isArray(searchParams.heuristic)
       ? searchParams.heuristic
       : [searchParams.heuristic]
     : [];
-  const { items } = await fetchQueue({ heuristic }, cookie);
+  const { items } = await fetchQueue({ heuristic });
 
   return (
     <AppShell

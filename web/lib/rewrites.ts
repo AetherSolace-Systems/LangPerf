@@ -1,4 +1,4 @@
-import { apiBase, CLIENT_API_URL } from "./api";
+import { apiFetch, apiFetchVoid } from "./fetch-utils";
 
 export type ProposedStep =
   | { kind: "tool_call"; tool_name: string; arguments: Record<string, unknown>; reasoning?: string }
@@ -17,13 +17,8 @@ export type Rewrite = {
   updated_at: string;
 };
 
-export async function listRewrites(trajectoryId: string, cookie?: string): Promise<Rewrite[]> {
-  const base = apiBase();
-  const res = await fetch(
-    `${base}/api/trajectories/${trajectoryId}/rewrites`,
-    cookie ? { headers: { cookie }, cache: "no-store" } : { credentials: "include", cache: "no-store" },
-  );
-  return res.json();
+export async function listRewrites(trajectoryId: string): Promise<Rewrite[]> {
+  return apiFetch<Rewrite[]>(`/api/trajectories/${trajectoryId}/rewrites`);
 }
 
 export async function createRewrite(
@@ -35,14 +30,10 @@ export async function createRewrite(
     status: "draft" | "submitted";
   },
 ): Promise<Rewrite> {
-  const res = await fetch(`${CLIENT_API_URL}/api/trajectories/${trajectoryId}/rewrites`, {
+  return apiFetch<Rewrite>(`/api/trajectories/${trajectoryId}/rewrites`, {
     method: "POST",
-    credentials: "include",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(payload),
+    body: payload,
   });
-  if (!res.ok) throw new Error(`createRewrite ${res.status}`);
-  return res.json();
 }
 
 export async function updateRewrite(
@@ -53,18 +44,12 @@ export async function updateRewrite(
     status: "draft" | "submitted";
   }>,
 ): Promise<Rewrite> {
-  const res = await fetch(`${CLIENT_API_URL}/api/rewrites/${id}`, {
+  return apiFetch<Rewrite>(`/api/rewrites/${id}`, {
     method: "PATCH",
-    credentials: "include",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(payload),
+    body: payload,
   });
-  return res.json();
 }
 
 export async function deleteRewrite(id: string): Promise<void> {
-  await fetch(`${CLIENT_API_URL}/api/rewrites/${id}`, {
-    method: "DELETE",
-    credentials: "include",
-  });
+  await apiFetchVoid(`/api/rewrites/${id}`, { method: "DELETE" });
 }

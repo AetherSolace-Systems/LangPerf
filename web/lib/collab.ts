@@ -1,4 +1,4 @@
-import { apiBase, CLIENT_API_URL } from "./api";
+import { apiFetch, apiFetchVoid } from "./fetch-utils";
 
 export type Comment = {
   id: string;
@@ -28,100 +28,62 @@ export type FailureMode = {
   color: string;
 };
 
-export async function listComments(trajectoryId: string, spanId: string, cookie?: string): Promise<Comment[]> {
-  const base = apiBase();
-  const res = await fetch(
-    `${base}/api/trajectories/${trajectoryId}/nodes/${spanId}/comments`,
-    cookie
-      ? { headers: { cookie }, cache: "no-store" }
-      : { credentials: "include", cache: "no-store" },
+export async function listComments(trajectoryId: string, spanId: string): Promise<Comment[]> {
+  return apiFetch<Comment[]>(
+    `/api/trajectories/${trajectoryId}/nodes/${spanId}/comments`,
   );
-  if (!res.ok) throw new Error(`listComments ${res.status}`);
-  return res.json();
 }
 
 export async function createComment(trajectoryId: string, spanId: string, body: string): Promise<Comment> {
-  const res = await fetch(
-    `${CLIENT_API_URL}/api/trajectories/${trajectoryId}/nodes/${spanId}/comments`,
-    {
-      method: "POST",
-      credentials: "include",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ body }),
-    },
+  return apiFetch<Comment>(
+    `/api/trajectories/${trajectoryId}/nodes/${spanId}/comments`,
+    { method: "POST", body: { body } },
   );
-  if (!res.ok) throw new Error(`createComment ${res.status}`);
-  return res.json();
 }
 
 export async function resolveComment(commentId: string): Promise<Comment> {
-  const res = await fetch(`${CLIENT_API_URL}/api/comments/${commentId}/resolve`, {
+  return apiFetch<Comment>(`/api/comments/${commentId}/resolve`, {
     method: "POST",
-    credentials: "include",
   });
-  return res.json();
 }
 
-export async function listNotifications(unreadOnly = false, cookie?: string): Promise<Notification[]> {
-  const base = apiBase();
-  const url = `${base}/api/notifications${unreadOnly ? "?unread_only=true" : ""}`;
-  const res = await fetch(
-    url,
-    cookie
-      ? { headers: { cookie }, cache: "no-store" }
-      : { credentials: "include", cache: "no-store" },
-  );
-  return res.json();
+export async function listNotifications(unreadOnly = false): Promise<Notification[]> {
+  const path = `/api/notifications${unreadOnly ? "?unread_only=true" : ""}`;
+  return apiFetch<Notification[]>(path);
 }
 
 export async function markNotificationRead(id: string): Promise<void> {
-  await fetch(`${CLIENT_API_URL}/api/notifications/${id}/read`, {
-    method: "POST",
-    credentials: "include",
-  });
+  await apiFetchVoid(`/api/notifications/${id}/read`, { method: "POST" });
 }
 
-export async function listFailureModes(cookie?: string): Promise<FailureMode[]> {
-  const base = apiBase();
-  const res = await fetch(`${base}/api/failure-modes`,
-    cookie
-      ? { headers: { cookie }, cache: "no-store" }
-      : { credentials: "include", cache: "no-store" },
-  );
-  return res.json();
+export async function listFailureModes(): Promise<FailureMode[]> {
+  return apiFetch<FailureMode[]>(`/api/failure-modes`);
 }
 
 export async function tagFailureMode(trajectoryId: string, failureModeId: string): Promise<void> {
-  await fetch(`${CLIENT_API_URL}/api/trajectories/${trajectoryId}/failure-modes`, {
+  await apiFetchVoid(`/api/trajectories/${trajectoryId}/failure-modes`, {
     method: "POST",
-    credentials: "include",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ failure_mode_id: failureModeId }),
+    body: { failure_mode_id: failureModeId },
   });
 }
 
 export async function untagFailureMode(trajectoryId: string, failureModeId: string): Promise<void> {
-  await fetch(`${CLIENT_API_URL}/api/trajectories/${trajectoryId}/failure-modes/${failureModeId}`, {
-    method: "DELETE",
-    credentials: "include",
-  });
+  await apiFetchVoid(
+    `/api/trajectories/${trajectoryId}/failure-modes/${failureModeId}`,
+    { method: "DELETE" },
+  );
 }
 
 export async function assignReviewer(trajectoryId: string, userId: string | null): Promise<void> {
-  await fetch(`${CLIENT_API_URL}/api/trajectories/${trajectoryId}/assign`, {
+  await apiFetchVoid(`/api/trajectories/${trajectoryId}/assign`, {
     method: "POST",
-    credentials: "include",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ user_id: userId }),
+    body: { user_id: userId },
   });
 }
 
 export async function createShareLink(trajectoryId: string): Promise<{ token: string }> {
-  const res = await fetch(`${CLIENT_API_URL}/api/trajectories/${trajectoryId}/share`, {
+  return apiFetch<{ token: string }>(`/api/trajectories/${trajectoryId}/share`, {
     method: "POST",
-    credentials: "include",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({}),
+    body: {},
   });
-  return res.json();
 }

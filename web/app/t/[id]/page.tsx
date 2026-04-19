@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { getTrajectory } from "@/lib/api";
 import { fetchTrajectoryHits } from "@/lib/triage";
@@ -19,7 +18,6 @@ export default async function TrajectoryPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const cookie = headers().get("cookie") ?? "";
   let traj;
   try {
     traj = await getTrajectory(id);
@@ -29,13 +27,13 @@ export default async function TrajectoryPage({
   }
   let hits: import("@/lib/triage").HeuristicHit[] = [];
   try {
-    hits = await fetchTrajectoryHits(id, cookie);
+    hits = await fetchTrajectoryHits(id);
   } catch {
     // hits are best-effort; don't crash the page if triage API is absent
   }
   let rewrites: import("@/lib/rewrites").Rewrite[] = [];
   try {
-    rewrites = await listRewrites(id, cookie);
+    rewrites = await listRewrites(id);
   } catch {
     // rewrites are best-effort; don't crash the page if the endpoint is absent
   }

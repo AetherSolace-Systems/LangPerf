@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { headers } from "next/headers";
 
 import { AppShell } from "@/components/shell/app-shell";
 import { Chip } from "@/components/ui/chip";
@@ -9,8 +8,7 @@ import { fetchClusters } from "@/lib/triage";
 export const dynamic = "force-dynamic";
 
 export default async function ClustersPage() {
-  const cookie = headers().get("cookie") ?? "";
-  const { clusters } = await fetchClusters(cookie);
+  const { clusters } = await fetchClusters();
 
   return (
     <AppShell
