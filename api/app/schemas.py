@@ -76,6 +76,18 @@ class FacetsResponse(BaseModel):
     tags: list[str]
 
 
+# ── Projects ──────────────────────────────────────────────────────────────
+
+
+class ProjectRef(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    slug: str
+    name: str
+    color: Optional[str] = None
+
+
 # ── Agents ────────────────────────────────────────────────────────────────
 
 

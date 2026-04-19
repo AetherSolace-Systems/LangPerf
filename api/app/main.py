@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.api import auth as auth_api
+from app.api import projects as projects_api
 from app.api.agents import router as agents_router
 from app.api.comments import router as comments_router
 from app.api.notifications import router as notifications_router
@@ -93,10 +94,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="LangPerf API", version="0.1.0", lifespan=lifespan)
 
+_default_origins = "http://localhost:3030,http://127.0.0.1:3030"
+_cors_origins = [
+    o.strip() for o in os.environ.get("LANGPERF_CORS_ORIGINS", _default_origins).split(",") if o.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=_cors_origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -113,6 +118,7 @@ async def healthz():
 
 
 app.include_router(auth_api.router)
+app.include_router(projects_api.router)
 app.include_router(otlp_router)
 app.include_router(trajectories_router)
 app.include_router(nodes_router)
