@@ -39,8 +39,8 @@ const EXPANDED_STEP_HEIGHT = 300;
 const FRAME_PAD_X = 16;
 const FRAME_PAD_Y = 14;
 const FRAME_TITLE = 32;
-const SEQ_GUTTER = 28; // vertical gap between sequence nodes — room for edge label
-const PAR_GUTTER = 28; // horizontal gap between parallel / horizontal-seq nodes
+const SEQ_GUTTER = 36; // vertical gap between sequence nodes — room for edge label
+const PAR_GUTTER = 56; // horizontal gap between parallel / horizontal-seq nodes
 // Allow a small slop so trivial "serial" span timing quirks don't trigger a
 // parallel frame (e.g. tool starts 3ms before the LLM's end timestamp).
 const PARALLEL_TOLERANCE_MS = 60;
@@ -101,16 +101,15 @@ function isExpanded(node: LayoutNode, ctx: LayoutCtx): boolean {
   return ctx.expandAll || ctx.expandedIds.has(node.span.span_id);
 }
 
-// An agent frame lays its children out horizontally when all of them are
-// compact (reads naturally left-to-right for linear sub-agent work). If any
-// child is expanded, fall back to vertical so the body has breathing room.
+// Agent frames always lay out horizontally — linear sub-agent work reads
+// naturally left-to-right. Expanded step children just make the frame wider;
+// React Flow's pan/zoom handles the rest.
 function shouldLayoutHorizontally(
   frame: LayoutNode,
-  children: LayoutNode[],
-  ctx: LayoutCtx,
+  _children: LayoutNode[],
+  _ctx: LayoutCtx,
 ): boolean {
-  if (frame.frameKind !== "agent") return false;
-  return children.every((c) => !isExpanded(c, ctx));
+  return frame.frameKind === "agent";
 }
 
 function endMsOf(s: Span): number {
