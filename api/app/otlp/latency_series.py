@@ -17,14 +17,9 @@ from typing import Optional
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import WINDOW_DELTAS
 from app.models import Trajectory
 from app.schemas import LatencyPoint
-
-_WINDOW_DELTA = {
-    "24h": timedelta(hours=24),
-    "7d": timedelta(days=7),
-    "30d": timedelta(days=30),
-}
 
 _BUCKET_FOR_WINDOW = {
     "24h": ("hour", timedelta(hours=1), 24),
@@ -40,7 +35,7 @@ async def latency_series(
     agent_id: Optional[str] = None,
 ) -> list[LatencyPoint]:
     """Return a back-filled latency series for the given window + optional agent scope."""
-    if window not in _WINDOW_DELTA:
+    if window not in WINDOW_DELTAS:
         raise ValueError(f"unknown window: {window}")
 
     bucket_kind, bucket_delta, bucket_count = _BUCKET_FOR_WINDOW[window]

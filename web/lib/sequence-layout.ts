@@ -13,6 +13,7 @@
 
 import type { Span } from "@/lib/api";
 import { kindOf } from "@/lib/span-fields";
+import { endMs, groupByParallel } from "@/lib/span-timing";
 import { buildTree, type TreeNode } from "@/lib/tree";
 
 export type FrameKind = "trajectory" | "agent" | "parallel" | "container";
@@ -41,9 +42,6 @@ const FRAME_PAD_Y = 14;
 const FRAME_TITLE = 32;
 const SEQ_GUTTER = 36; // vertical gap between sequence nodes — room for edge label
 const PAR_GUTTER = 56; // horizontal gap between parallel / horizontal-seq nodes
-// Allow a small slop so trivial "serial" span timing quirks don't trigger a
-// parallel frame (e.g. tool starts 3ms before the LLM's end timestamp).
-const PARALLEL_TOLERANCE_MS = 60;
 
 export type LayoutOptions = {
   expandedIds?: Set<string>;
@@ -114,11 +112,6 @@ function shouldLayoutHorizontally(
   return children.every((c) => c.kind === "step");
 }
 
-function endMsOf(s: Span): number {
-  if (s.ended_at) return new Date(s.ended_at).getTime();
-  return new Date(s.started_at).getTime() + (s.duration_ms ?? 0);
-}
-
 function buildNode(
   treeNode: TreeNode,
   counter: { n: number },
@@ -170,7 +163,11 @@ function buildNode(
   all.push(frameNode);
 
   // Group consecutive children that overlap in time into parallel frames.
-  const groups = groupByParallel(rawChildren);
+  const groups = groupByParallel(
+    rawChildren,
+    (tn) => new Date(tn.span.started_at).getTime(),
+    (tn) => endMs(tn.span),
+  );
 
   const frameChildIds: string[] = [];
   for (const group of groups) {
@@ -280,28 +277,6 @@ function positionChildren(node: LayoutNode, all: LayoutNode[]): void {
 
 function approxEqual(a: number, b: number): boolean {
   return Math.abs(a - b) < 1;
-}
-
-function groupByParallel(siblings: TreeNode[]): TreeNode[][] {
-  if (siblings.length === 0) return [];
-  const groups: TreeNode[][] = [];
-  let current: TreeNode[] = [siblings[0]];
-  let currentEnd = endMsOf(siblings[0].span);
-  for (let i = 1; i < siblings.length; i++) {
-    const tn = siblings[i];
-    const startMs = new Date(tn.span.started_at).getTime();
-    if (startMs < currentEnd - PARALLEL_TOLERANCE_MS) {
-      // overlaps with the running group → parallel
-      current.push(tn);
-      currentEnd = Math.max(currentEnd, endMsOf(tn.span));
-    } else {
-      groups.push(current);
-      current = [tn];
-      currentEnd = endMsOf(tn.span);
-    }
-  }
-  groups.push(current);
-  return groups;
 }
 
 function resolveLabel(span: Span): string {

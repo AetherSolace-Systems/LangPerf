@@ -1,42 +1,12 @@
 import type { Edge } from "@xyflow/react";
 import type { Span } from "./api";
-import { kindOf } from "./span-fields";
+import { kindOf, toolName, toolOutput } from "./span-fields";
+import { endMs, groupByParallel } from "./span-timing";
 
 export type LabelledEdgeData = {
   label: string;
   payload?: string;
 };
-
-// Siblings whose time ranges overlap are treated as a parallel group and
-// visualised as a fan-out/fan-in (diamond) instead of a sequential chain.
-// Must match the tolerance in sequence-layout.ts to stay consistent.
-const PARALLEL_TOLERANCE_MS = 60;
-
-function endMs(s: Span): number {
-  if (s.ended_at) return new Date(s.ended_at).getTime();
-  return new Date(s.started_at).getTime() + (s.duration_ms ?? 0);
-}
-
-function groupByParallel(siblings: Span[]): Span[][] {
-  if (siblings.length === 0) return [];
-  const groups: Span[][] = [];
-  let current: Span[] = [siblings[0]];
-  let currentEnd = endMs(siblings[0]);
-  for (let i = 1; i < siblings.length; i++) {
-    const s = siblings[i];
-    const startMs = new Date(s.started_at).getTime();
-    if (startMs < currentEnd - PARALLEL_TOLERANCE_MS) {
-      current.push(s);
-      currentEnd = Math.max(currentEnd, endMs(s));
-    } else {
-      groups.push(current);
-      current = [s];
-      currentEnd = endMs(s);
-    }
-  }
-  groups.push(current);
-  return groups;
-}
 
 export function buildEdges(spans: Span[]): Edge<LabelledEdgeData>[] {
   const byParent = new Map<string | null, Span[]>();
@@ -51,7 +21,11 @@ export function buildEdges(spans: Span[]): Edge<LabelledEdgeData>[] {
     siblings.sort(
       (a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime(),
     );
-    const groups = groupByParallel(siblings);
+    const groups = groupByParallel(
+      siblings,
+      (s) => new Date(s.started_at).getTime(),
+      (s) => endMs(s),
+    );
     for (let gi = 1; gi < groups.length; gi++) {
       const prev = groups[gi - 1];
       const curr = groups[gi];
@@ -112,16 +86,6 @@ function edgeLabel(
   return "next";
 }
 
-function toolName(span: Span): string | null {
-  const attrs = span.attributes as Record<string, unknown> | null;
-  if (!attrs) return null;
-  for (const k of ["tool.name", "gen_ai.tool.name", "name"]) {
-    const v = attrs[k];
-    if (typeof v === "string" && v) return v;
-  }
-  return null;
-}
-
 function edgePayload(from: Span, to: Span): string | undefined {
   const fromKind = kindOf(from);
   const toKind = kindOf(to);
@@ -140,15 +104,6 @@ function firstToolInput(span: Span): unknown {
   const a = span.attributes as Record<string, unknown> | null;
   if (!a) return null;
   for (const k of ["tool.arguments", "gen_ai.tool.arguments", "input", "parameters"]) {
-    if (a[k] != null) return a[k];
-  }
-  return null;
-}
-
-function toolOutput(span: Span): unknown {
-  const a = span.attributes as Record<string, unknown> | null;
-  if (!a) return null;
-  for (const k of ["tool.output", "gen_ai.tool.output", "output", "result"]) {
     if (a[k] != null) return a[k];
   }
   return null;

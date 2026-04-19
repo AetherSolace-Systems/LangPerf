@@ -792,7 +792,7 @@ def traj_nested_subagents() -> None:
 
 
 def main() -> int:
-    langperf.init(service_name="langperf-demo-seed", environment="dev")
+    langperf.init(agent_name="langperf-demo-seed", environment="dev")
 
     trajectories = [
         ("quick greeting", traj_simple_greeting),

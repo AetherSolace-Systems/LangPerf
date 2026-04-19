@@ -27,7 +27,7 @@ def lookup_weather(city: str) -> dict:
 def main() -> int:
     langperf.init(
         endpoint=os.environ.get("LANGPERF_ENDPOINT", "http://localhost:4318"),
-        service_name="lm-studio-demo",
+        agent_name="lm-studio-demo",
         environment="dev",
     )
 

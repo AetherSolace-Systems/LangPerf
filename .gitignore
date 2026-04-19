@@ -17,6 +17,10 @@ node_modules/
 .turbo/
 out/
 
+# Auto-generated TypeScript files (web)
+web/next-env.d.ts
+web/tsconfig.tsbuildinfo
+
 # Env
 .env
 .env.local

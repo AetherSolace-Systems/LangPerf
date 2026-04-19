@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 
-const API_BASE = "http://localhost:4318";
+const API_BASE = process.env.LANGPERF_API_BASE ?? "http://localhost:4318";
 
 /**
  * Fetch an existing agent name from the backend so tests don't hard-code one.

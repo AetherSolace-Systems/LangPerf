@@ -1,5 +1,11 @@
-import { apiBase } from "./api";
+import { apiBase, type ProjectRef } from "./api";
 
+// Re-export the minimal embedded shape used by AgentSummary, so callers that
+// only need {id, slug, name, color} can consume it without importing api.ts.
+export type { ProjectRef };
+
+// Full project record returned by /api/projects — extends the minimal ref
+// with description + counts + timestamp.
 export type Project = {
   id: string;
   slug: string;

@@ -6,17 +6,9 @@ from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import DEFAULT_FAILURE_MODES
 from app.models import FailureMode, Organization, Project
 from sqlalchemy import select
-
-
-DEFAULT_FAILURE_MODES = [
-    ("wrong_tool", "Wrong tool", "warn"),
-    ("bad_args", "Bad args", "warn"),
-    ("hallucination", "Hallucination", "peach-neon"),
-    ("loop", "Loop", "peach-neon"),
-    ("misunderstood_intent", "Misunderstood intent", "steel-mist"),
-]
 
 
 async def get_default_org_id(db: AsyncSession) -> str:

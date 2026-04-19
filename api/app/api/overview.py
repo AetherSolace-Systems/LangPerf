@@ -15,6 +15,7 @@ from sqlalchemy import Integer, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import require_user
+from app.constants import WINDOW_DELTAS
 from app.db import get_session
 from app.models import Agent, Span, Trajectory
 from app.otlp.latency_series import latency_series
@@ -30,12 +31,6 @@ from app.schemas import (
 
 router = APIRouter(prefix="/api/overview")
 
-_WINDOW_DELTA = {
-    "24h": timedelta(hours=24),
-    "7d": timedelta(days=7),
-    "30d": timedelta(days=30),
-}
-
 
 @router.get("", response_model=OverviewResponse)
 async def get_overview(
@@ -43,7 +38,7 @@ async def get_overview(
     session: AsyncSession = Depends(get_session),
     user=require_user(),
 ) -> OverviewResponse:
-    since = datetime.now(tz=timezone.utc) - _WINDOW_DELTA[window]
+    since = datetime.now(tz=timezone.utc) - WINDOW_DELTAS[window]
 
     runs = (
         await session.execute(

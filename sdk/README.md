@@ -49,9 +49,14 @@ tool calls, token counts, timing, model name.
   UI when you register the agent. Rotating the token in the UI invalidates
   the old one immediately.
 - `LANGPERF_ENDPOINT` — OTLP endpoint base URL (default `http://localhost:4318`)
-- `LANGPERF_SERVICE_NAME` — *(deprecated; use `agent_name` kwarg)* — service name shown in the UI
+- `LANGPERF_AGENT_NAME` — agent name shown in the UI (falls back to the `agent_name` kwarg)
 - `LANGPERF_ENVIRONMENT` — maps to OTel `deployment.environment`
 - `LANGPERF_VERSION` — sets `service.version` attribute on OTel resource
+
+### Legacy
+
+- `LANGPERF_SERVICE_NAME` — *(deprecated; use `LANGPERF_AGENT_NAME`)* — still
+  honored for back-compat; emits a `DeprecationWarning`.
 
 ## Upgrade notes
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 import uuid as _uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -15,6 +15,7 @@ from sqlalchemy.orm import selectinload
 
 from app.auth.agent_token import generate_token, hash_token
 from app.auth.deps import require_user
+from app.constants import WINDOW_DELTAS
 from app.db import get_session
 from app.models import Agent, AgentVersion, Span, Trajectory
 from app.otlp.latency_series import latency_series
@@ -82,7 +83,7 @@ async def list_agents(
     if not with_metrics:
         return [AgentSummary.model_validate(a) for a in agents]
 
-    since = datetime.now(tz=timezone.utc) - _WINDOW_DELTA[window]
+    since = datetime.now(tz=timezone.utc) - WINDOW_DELTAS[window]
 
     runs_by_agent = {
         row.agent_id: int(row.n)
@@ -387,13 +388,6 @@ async def patch_agent(
     return AgentDetail.model_validate(agent)
 
 
-_WINDOW_DELTA = {
-    "24h": timedelta(hours=24),
-    "7d": timedelta(days=7),
-    "30d": timedelta(days=30),
-}
-
-
 async def _resolve_agent(session: AsyncSession, name: str, org_id: str) -> Agent:
     result = await session.execute(
         select(Agent).where(Agent.name == name, Agent.org_id == org_id)
@@ -412,7 +406,7 @@ async def get_agent_metrics(
     user=require_user(),
 ) -> AgentMetrics:
     agent = await _resolve_agent(session, name, user.org_id)
-    since = datetime.now(tz=timezone.utc) - _WINDOW_DELTA[window]
+    since = datetime.now(tz=timezone.utc) - WINDOW_DELTAS[window]
 
     runs = (
         await session.execute(
@@ -495,7 +489,7 @@ async def get_agent_tools(
     user=require_user(),
 ) -> list[AgentToolUsage]:
     agent = await _resolve_agent(session, name, user.org_id)
-    since = datetime.now(tz=timezone.utc) - _WINDOW_DELTA[window]
+    since = datetime.now(tz=timezone.utc) - WINDOW_DELTAS[window]
 
     result = await session.execute(
         select(
