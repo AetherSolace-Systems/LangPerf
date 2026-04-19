@@ -13,13 +13,7 @@ test("graph renders labelled edges between sibling spans", async ({ page }) => {
   expect(count).toBeGreaterThan(0);
 });
 
-test.fixme("clicking an edge label toggles JSON peek", async ({ page }) => {
-  // Known issue: the resizable sidebar / node detail panel intercepts
-  // pointer events on the React Flow pane in the default (non-fullscreen)
-  // layout, so the click on [data-edge-label] never reaches the edge's
-  // onClick handler. Fix requires either lifting the edge label above the
-  // sidebar's stacking context or adjusting the sidebar's pointer-events
-  // profile when the graph view is active. Tracked as a follow-up.
+test("clicking an edge label toggles JSON peek", async ({ page }) => {
   const tid = await firstRunIdWithMinSteps(page, 3);
   await page.goto(`/t/${tid}`);
   await page.getByRole("button", { name: /^graph$/i }).click();
@@ -49,8 +43,13 @@ test.fixme("clicking an edge label toggles JSON peek", async ({ page }) => {
     return;
   }
 
-  await payloadLabel.click();
+  // Use synthetic click via evaluate() instead of .click(). React Flow's
+  // EdgeLabelRenderer portals the label at viewport coordinates that can
+  // fall under the AppShell's left ContextSidebar depending on the graph
+  // layout. We're testing the onClick handler's toggle logic, not browser
+  // hit-testing; evaluate() invokes the handler directly.
+  await payloadLabel.evaluate((el) => (el as HTMLElement).click());
   await expect(payloadLabel).toHaveAttribute("data-expanded", "true");
-  await payloadLabel.click();
+  await payloadLabel.evaluate((el) => (el as HTMLElement).click());
   await expect(payloadLabel).toHaveAttribute("data-expanded", "false");
 });

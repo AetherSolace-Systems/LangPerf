@@ -57,7 +57,10 @@ export function LabelledEdge({
             cursor: data?.payload ? "pointer" : "default",
             maxWidth: expanded ? 240 : undefined,
             whiteSpace: expanded ? "normal" : "nowrap",
-            zIndex: 1,
+            // Lift above React Flow's internal pane / edges / node wrappers
+            // so the click actually reaches our onClick rather than the pane's
+            // drag handler. Any value > the default flow layers (5) works.
+            zIndex: 20,
           }}
         >
           <div>{data?.label ?? "→"}</div>
