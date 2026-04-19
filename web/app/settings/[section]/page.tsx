@@ -5,6 +5,8 @@ import { ContextSidebar } from "@/components/shell/context-sidebar";
 import { SETTINGS_SECTIONS } from "@/components/shell/nav-config";
 import { LogForwardingForm } from "@/components/settings/log-forwarding-form";
 import { getLogForwarding } from "@/lib/api";
+import { listProjects } from "@/lib/projects";
+import { ProjectsManager } from "@/components/projects/projects-manager";
 
 export const dynamic = "force-dynamic";
 
@@ -79,6 +81,7 @@ export default async function SettingsSection({
     "environments": "Phase 2 — rename and order your dev/staging/prod environments.",
     "agents-review": "Phase 2 — queue of auto-detected agents needing human review.",
     "webhooks": "Follow-up — outbound webhooks on run events.",
+    "projects": "Group agents under projects. Delete blocks until agents are reassigned.",
   };
 
   let logForwardingConfig = null;
@@ -87,6 +90,15 @@ export default async function SettingsSection({
       logForwardingConfig = await getLogForwarding();
     } catch {
       // Surface the error inside the panel below instead of 500'ing the whole page.
+    }
+  }
+
+  let projectsData: Awaited<ReturnType<typeof listProjects>> | null = null;
+  if (section === "projects") {
+    try {
+      projectsData = await listProjects();
+    } catch {
+      // surface error in the panel
     }
   }
 
@@ -111,6 +123,16 @@ export default async function SettingsSection({
               <div className="text-[13px] text-warm-fog">
                 Check that <code className="font-mono text-aether-teal">langperf-api</code>{" "}
                 is running and that migration 0008 applied.
+              </div>
+            </div>
+          )
+        ) : section === "projects" ? (
+          projectsData ? (
+            <ProjectsManager initial={projectsData} />
+          ) : (
+            <div className="border border-[color:var(--border)] border-l-2 border-l-warn rounded-[3px] bg-[color:var(--surface)] p-[14px] max-w-[760px]">
+              <div className="font-mono text-[9px] text-warn uppercase tracking-[0.1em] mb-[4px]">
+                could not load projects
               </div>
             </div>
           )

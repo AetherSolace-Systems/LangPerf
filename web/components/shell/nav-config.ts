@@ -37,6 +37,7 @@ export type SettingsSection = {
 export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: "profile",        label: "Profile",             href: "/settings/profile",         group: "workspace" },
   { id: "environments",   label: "Environments",        href: "/settings/environments",    group: "workspace" },
+  { id: "projects",       label: "Projects",            href: "/settings/projects",        group: "workspace" },
   { id: "agents-review",  label: "Agents · auto-detected", href: "/settings/agents-review", group: "workspace" },
   { id: "log-forwarding", label: "Log forwarding",      href: "/settings/log-forwarding",  group: "observability" },
   { id: "trace-export",   label: "Agent trace export",  href: "/settings/trace-export",    group: "observability" },
