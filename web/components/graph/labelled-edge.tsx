@@ -32,7 +32,7 @@ export function LabelledEdge({
 
   return (
     <>
-      <BaseEdge id={id} path={edgePath} style={{ stroke: "var(--border-strong)", strokeWidth: 1 }} />
+      <BaseEdge id={id} path={edgePath} style={{ stroke: "var(--muted)", strokeWidth: 1.5, strokeOpacity: 0.75 }} />
       <EdgeLabelRenderer>
         <div
           data-edge-label=""

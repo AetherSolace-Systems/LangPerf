@@ -46,7 +46,10 @@ function edgeLabel(from: Span, to: Span): string {
   }
   if (fromKind === "tool" && toKind === "llm") return "return";
   if (fromKind === "llm" && toKind === "llm") return "message";
-  return "→";
+  if (toKind === "agent") return `delegate:${to.name ?? "agent"}`;
+  if (fromKind === "agent") return "resume";
+  if (fromKind === "tool" && toKind === "tool") return "next-tool";
+  return "next";
 }
 
 function toolName(span: Span): string | null {

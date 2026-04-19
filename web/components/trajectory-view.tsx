@@ -90,7 +90,28 @@ function TrajectoryLayout({ trajectory }: { trajectory: TrajectoryDetail }) {
 
   if (fsOpen) {
     return (
-      <div data-fs="1" className="h-screen flex flex-col">
+      <div
+        data-fs="1"
+        className="fixed inset-0 z-50 flex flex-col bg-[color:var(--background)]"
+      >
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-[color:var(--border)] flex-shrink-0">
+          <span className="font-mono text-[10px] text-patina uppercase tracking-wider">run</span>
+          <span className="text-xs text-warm-fog/90 truncate">
+            {trajectory.name ?? "(unnamed)"}
+          </span>
+          <span className="text-xs font-mono text-twilight">
+            {trajectory.id.slice(0, 8)}…
+          </span>
+          <div className="flex-1" />
+          <button
+            type="button"
+            onClick={() => toggleFs()}
+            className="text-[10px] uppercase tracking-wider text-twilight hover:text-warm-fog border border-[color:var(--border)] rounded px-2 py-0.5"
+            title="Exit full-screen (Esc)"
+          >
+            exit full-screen
+          </button>
+        </div>
         <div className="flex flex-1 overflow-hidden">
           <div className="flex-1 min-w-0">
             <TrajectoryGraph
