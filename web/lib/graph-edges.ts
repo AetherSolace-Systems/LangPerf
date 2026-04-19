@@ -7,6 +7,37 @@ export type LabelledEdgeData = {
   payload?: string;
 };
 
+// Siblings whose time ranges overlap are treated as a parallel group and
+// visualised as a fan-out/fan-in (diamond) instead of a sequential chain.
+// Must match the tolerance in sequence-layout.ts to stay consistent.
+const PARALLEL_TOLERANCE_MS = 60;
+
+function endMs(s: Span): number {
+  if (s.ended_at) return new Date(s.ended_at).getTime();
+  return new Date(s.started_at).getTime() + (s.duration_ms ?? 0);
+}
+
+function groupByParallel(siblings: Span[]): Span[][] {
+  if (siblings.length === 0) return [];
+  const groups: Span[][] = [];
+  let current: Span[] = [siblings[0]];
+  let currentEnd = endMs(siblings[0]);
+  for (let i = 1; i < siblings.length; i++) {
+    const s = siblings[i];
+    const startMs = new Date(s.started_at).getTime();
+    if (startMs < currentEnd - PARALLEL_TOLERANCE_MS) {
+      current.push(s);
+      currentEnd = Math.max(currentEnd, endMs(s));
+    } else {
+      groups.push(current);
+      current = [s];
+      currentEnd = endMs(s);
+    }
+  }
+  groups.push(current);
+  return groups;
+}
+
 export function buildEdges(spans: Span[]): Edge<LabelledEdgeData>[] {
   const byParent = new Map<string | null, Span[]>();
   for (const s of spans) {
@@ -20,20 +51,28 @@ export function buildEdges(spans: Span[]): Edge<LabelledEdgeData>[] {
     siblings.sort(
       (a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime(),
     );
-    for (let i = 1; i < siblings.length; i++) {
-      const from = siblings[i - 1];
-      const to = siblings[i];
-      const label = edgeLabel(from, to);
-      const payload = edgePayload(from, to);
-      edges.push({
-        id: `e-${from.span_id}-${to.span_id}`,
-        source: from.span_id,
-        target: to.span_id,
-        sourceHandle: "s-br",
-        targetHandle: "t-tl",
-        type: "labelled",
-        data: { label, payload },
-      });
+    const groups = groupByParallel(siblings);
+    // Fan-out / fan-in between consecutive groups. Within a group (parallel
+    // siblings), there is no sequential edge — they share a predecessor and a
+    // successor, not each other.
+    for (let gi = 1; gi < groups.length; gi++) {
+      const prev = groups[gi - 1];
+      const curr = groups[gi];
+      for (const from of prev) {
+        for (const to of curr) {
+          const label = edgeLabel(from, to);
+          const payload = edgePayload(from, to);
+          edges.push({
+            id: `e-${from.span_id}-${to.span_id}`,
+            source: from.span_id,
+            target: to.span_id,
+            sourceHandle: "s-br",
+            targetHandle: "t-tl",
+            type: "labelled",
+            data: { label, payload },
+          });
+        }
+      }
     }
   }
   return edges;
