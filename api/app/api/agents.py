@@ -18,6 +18,7 @@ from app.auth.deps import require_user
 from app.db import get_session
 from app.models import Agent, AgentVersion, Span, Trajectory
 from app.otlp.latency_series import latency_series
+from app.projects.helpers import get_default_project_id, get_project_by_slug
 from app.schemas import (
     AgentDetail,
     AgentMiniMetrics,
@@ -47,6 +48,7 @@ class AgentCreate(BaseModel):
     description: str | None = None
     language: str | None = None
     github_url: str | None = None
+    project_slug: str | None = None
 
 
 @router.get(
@@ -58,16 +60,23 @@ async def list_agents(
     offset: int = Query(default=0, ge=0),
     with_metrics: bool = Query(default=False),
     window: str = Query(default="7d", pattern="^(24h|7d|30d)$"),
+    project: Optional[str] = Query(default=None),
     session: AsyncSession = Depends(get_session),
     user=require_user(),
 ):
-    result = await session.execute(
+    stmt = (
         select(Agent)
         .where(Agent.org_id == user.org_id)
         .order_by(Agent.name)
         .limit(limit)
         .offset(offset)
     )
+    if project is not None:
+        proj = await get_project_by_slug(session, user.org_id, project)
+        if proj is None:
+            return []
+        stmt = stmt.where(Agent.project_id == proj.id)
+    result = await session.execute(stmt)
     agents = list(result.scalars().all())
 
     if not with_metrics:
@@ -203,6 +212,15 @@ async def create_agent(
     ).scalar_one_or_none()
     if existing is not None:
         raise HTTPException(status_code=409, detail=f"agent {payload.name!r} already exists")
+    if payload.project_slug:
+        proj = await get_project_by_slug(session, user.org_id, payload.project_slug)
+        if proj is None:
+            raise HTTPException(
+                status_code=404, detail=f"project {payload.project_slug!r} not found"
+            )
+        project_id = proj.id
+    else:
+        project_id = await get_default_project_id(session, user.org_id)
     token, prefix = generate_token()
     agent = Agent(
         org_id=user.org_id,
@@ -215,10 +233,17 @@ async def create_agent(
         token_hash=hash_token(token),
         token_prefix=prefix,
         created_by_user_id=user.id,
+        project_id=project_id,
     )
     session.add(agent)
     await session.commit()
-    await session.refresh(agent)
+    agent = (
+        await session.execute(
+            select(Agent)
+            .where(Agent.id == agent.id)
+            .options(selectinload(Agent.project))
+        )
+    ).scalar_one()
     return {"agent": _agent_to_dict(agent), "token": token}
 
 
@@ -291,7 +316,7 @@ async def get_agent(
     result = await session.execute(
         select(Agent)
         .where(Agent.name == name, Agent.org_id == user.org_id)
-        .options(selectinload(Agent.versions))
+        .options(selectinload(Agent.versions), selectinload(Agent.project))
     )
     agent = result.scalar_one_or_none()
     if agent is None:
@@ -309,7 +334,7 @@ async def patch_agent(
     result = await session.execute(
         select(Agent)
         .where(Agent.name == name, Agent.org_id == user.org_id)
-        .options(selectinload(Agent.versions))
+        .options(selectinload(Agent.versions), selectinload(Agent.project))
     )
     agent = result.scalar_one_or_none()
     if agent is None:
@@ -343,9 +368,22 @@ async def patch_agent(
         agent.owner = patch.owner or None
     if patch.github_url is not None:
         agent.github_url = patch.github_url or None
+    if patch.project_slug is not None:
+        proj = await get_project_by_slug(session, user.org_id, patch.project_slug)
+        if proj is None:
+            raise HTTPException(status_code=404, detail="project not found")
+        agent.project_id = proj.id
 
     await session.commit()
-    await session.refresh(agent)
+    agent_id = agent.id
+    session.expire(agent)
+    agent = (
+        await session.execute(
+            select(Agent)
+            .where(Agent.id == agent_id)
+            .options(selectinload(Agent.versions), selectinload(Agent.project))
+        )
+    ).scalar_one()
     return AgentDetail.model_validate(agent)
 
 

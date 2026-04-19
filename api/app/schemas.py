@@ -117,6 +117,7 @@ class AgentSummary(BaseModel):
     last_token_used_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
+    project: Optional[ProjectRef] = None
 
 
 class AgentDetail(AgentSummary):
@@ -130,6 +131,7 @@ class AgentPatch(BaseModel):
     owner: Optional[str] = None
     github_url: Optional[str] = None
     rename_to: Optional[str] = None
+    project_slug: Optional[str] = None
 
 
 class AgentToolUsage(BaseModel):

@@ -50,10 +50,15 @@ async def test_rotate_token_changes_prefix(client):
 
 async def test_issue_token_on_legacy_agent(client, session):
     await _bootstrap(client)
-    from app.models import Agent, Organization
+    from app.models import Agent, Organization, Project
     from sqlalchemy import select
     org = (await session.execute(select(Organization))).scalar_one()
-    session.add(Agent(org_id=org.id, signature="legacy:x", name="legacy-bot"))
+    proj = (
+        await session.execute(
+            select(Project).where(Project.org_id == org.id, Project.slug == "default")
+        )
+    ).scalar_one()
+    session.add(Agent(org_id=org.id, signature="legacy:x", name="legacy-bot", project_id=proj.id))
     await session.commit()
 
     r = await client.post("/api/agents/legacy-bot/issue-token")

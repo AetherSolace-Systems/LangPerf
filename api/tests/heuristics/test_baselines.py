@@ -7,9 +7,12 @@ from app.heuristics.baselines import compute_p95_baselines
 
 @pytest.mark.asyncio
 async def test_p95_baselines(session):
-    from app.models import Agent, Organization, Span, Trajectory
+    from app.models import Agent, Organization, Project, Span, Trajectory
+    import uuid as _uuid
     org = Organization(name="default", slug="default"); session.add(org); await session.flush()
-    agent = Agent(org_id=org.id, signature="sig", name="agent-a", display_name="A")
+    proj = Project(id=str(_uuid.uuid4()), org_id=org.id, name="Default", slug="default")
+    session.add(proj); await session.flush()
+    agent = Agent(org_id=org.id, signature="sig", name="agent-a", display_name="A", project_id=proj.id)
     session.add(agent); await session.flush()
     t = Trajectory(org_id=org.id, trace_id="t", service_name="svc", name="n", agent_id=agent.id)
     session.add(t); await session.flush()

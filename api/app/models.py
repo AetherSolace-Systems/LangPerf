@@ -129,10 +129,10 @@ class Agent(Base):
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
-    project_id: Mapped[str | None] = mapped_column(
+    project_id: Mapped[str] = mapped_column(
         UUIDStr,
         ForeignKey("projects.id", ondelete="RESTRICT"),
-        nullable=True,
+        nullable=False,
         index=True,
     )
 
@@ -141,6 +141,7 @@ class Agent(Base):
         cascade="all, delete-orphan",
         order_by="AgentVersion.first_seen_at.desc()",
     )
+    project: Mapped["Project"] = relationship(lazy="selectin")
 
 
 class AgentVersion(Base):

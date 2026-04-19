@@ -1,6 +1,8 @@
+import uuid as _uuid
+
 from sqlalchemy import select
 
-from app.models import Agent, Organization, Trajectory, User
+from app.models import Agent, Organization, Project, Trajectory, User
 
 
 async def test_list_trajectories_scoped_to_current_org(client, session):
@@ -31,7 +33,10 @@ async def test_list_agents_scoped_to_current_org(client, session):
     other_org = Organization(name="other", slug="other")
     session.add(other_org)
     await session.flush()
-    session.add(Agent(org_id=other_org.id, signature="hidden-sig", name="hidden-agent", display_name="Hidden"))
+    other_proj = Project(id=str(_uuid.uuid4()), org_id=other_org.id, name="Default", slug="default")
+    session.add(other_proj)
+    await session.flush()
+    session.add(Agent(org_id=other_org.id, signature="hidden-sig", name="hidden-agent", display_name="Hidden", project_id=other_proj.id))
     await session.commit()
 
     r = await client.get("/api/agents")
