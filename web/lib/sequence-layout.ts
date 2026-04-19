@@ -33,35 +33,46 @@ export type LayoutNode = {
 };
 
 // --- sizing constants ---
-const STEP_WIDTH = 220;
-const STEP_HEIGHT = 64;
-const FRAME_PAD_X = 18;
-const FRAME_PAD_Y = 16;
-const FRAME_TITLE = 34;
-const SEQ_GUTTER = 18;
-const PAR_GUTTER = 24;
+const STEP_WIDTH = 240;
+const STEP_HEIGHT = 58;
+const EXPANDED_STEP_HEIGHT = 300;
+const FRAME_PAD_X = 16;
+const FRAME_PAD_Y = 14;
+const FRAME_TITLE = 32;
+const SEQ_GUTTER = 28; // vertical gap between sequence nodes — room for edge label
+const PAR_GUTTER = 28; // horizontal gap between parallel / horizontal-seq nodes
 // Allow a small slop so trivial "serial" span timing quirks don't trigger a
 // parallel frame (e.g. tool starts 3ms before the LLM's end timestamp).
 const PARALLEL_TOLERANCE_MS = 60;
 
-export function buildSequenceLayout(spans: Span[]): {
+export type LayoutOptions = {
+  expandedIds?: Set<string>;
+  expandAll?: boolean;
+};
+
+export function buildSequenceLayout(
+  spans: Span[],
+  opts: LayoutOptions = {},
+): {
   all: LayoutNode[];
   rootIds: string[];
   maxExecOrder: number;
 } {
   if (spans.length === 0) return { all: [], rootIds: [], maxExecOrder: 0 };
 
+  const expandedIds = opts.expandedIds ?? new Set<string>();
+  const expandAll = opts.expandAll ?? false;
+
   // Delegate parent/child + sort-by-start to the canonical tree builder.
-  // Sequence layout is the only other consumer of that relationship — we
-  // own the overlap-detection and sizing on top, not the tree walk itself.
   const roots = buildTree(spans);
 
   const all: LayoutNode[] = [];
   const counter = { n: 0 };
   const rootIds: string[] = [];
+  const ctx = { expandedIds, expandAll };
 
   for (const root of roots) {
-    const node = buildNode(root, counter, null, all);
+    const node = buildNode(root, counter, null, all, ctx);
     rootIds.push(node.id);
   }
 
@@ -83,6 +94,25 @@ export function buildSequenceLayout(spans: Span[]): {
   return { all, rootIds, maxExecOrder: counter.n };
 }
 
+type LayoutCtx = { expandedIds: Set<string>; expandAll: boolean };
+
+function isExpanded(node: LayoutNode, ctx: LayoutCtx): boolean {
+  if (node.kind !== "step" || !node.span) return false;
+  return ctx.expandAll || ctx.expandedIds.has(node.span.span_id);
+}
+
+// An agent frame lays its children out horizontally when all of them are
+// compact (reads naturally left-to-right for linear sub-agent work). If any
+// child is expanded, fall back to vertical so the body has breathing room.
+function shouldLayoutHorizontally(
+  frame: LayoutNode,
+  children: LayoutNode[],
+  ctx: LayoutCtx,
+): boolean {
+  if (frame.frameKind !== "agent") return false;
+  return children.every((c) => !isExpanded(c, ctx));
+}
+
 function endMsOf(s: Span): number {
   if (s.ended_at) return new Date(s.ended_at).getTime();
   return new Date(s.started_at).getTime() + (s.duration_ms ?? 0);
@@ -93,6 +123,7 @@ function buildNode(
   counter: { n: number },
   parentId: string | null,
   all: LayoutNode[],
+  ctx: LayoutCtx,
 ): LayoutNode {
   const span = treeNode.span;
   const rawChildren = treeNode.children; // already sorted by start_at in buildTree
@@ -100,6 +131,7 @@ function buildNode(
 
   if (rawChildren.length === 0) {
     counter.n += 1;
+    const expanded = ctx.expandAll || ctx.expandedIds.has(span.span_id);
     const node: LayoutNode = {
       id: span.span_id,
       kind: "step",
@@ -109,7 +141,7 @@ function buildNode(
       execOrder: counter.n,
       parentId,
       width: STEP_WIDTH,
-      height: STEP_HEIGHT,
+      height: expanded ? EXPANDED_STEP_HEIGHT : STEP_HEIGHT,
       x: 0,
       y: 0,
     };
@@ -142,7 +174,7 @@ function buildNode(
   const frameChildIds: string[] = [];
   for (const group of groups) {
     if (group.length === 1) {
-      const c = buildNode(group[0], counter, frameNode.id, all);
+      const c = buildNode(group[0], counter, frameNode.id, all, ctx);
       frameChildIds.push(c.id);
     } else {
       // Synthetic parallel frame
@@ -165,7 +197,7 @@ function buildNode(
       all.push(parNode);
       const parChildIds: string[] = [];
       for (const s of group) {
-        const c = buildNode(s, counter, parNode.id, all);
+        const c = buildNode(s, counter, parNode.id, all, ctx);
         parChildIds.push(c.id);
       }
       // Size parallel frame (horizontal layout of branches)
@@ -182,14 +214,23 @@ function buildNode(
     }
   }
 
-  // Size frame (vertical stack of its children)
+  // Size the frame based on its layout direction.
   const frameChildren = frameChildIds.map((id) => all.find((n) => n.id === id)!);
-  const innerW = Math.max(...frameChildren.map((c) => c.width));
-  const innerH =
-    frameChildren.reduce((sum, c) => sum + c.height, 0) +
-    SEQ_GUTTER * Math.max(0, frameChildren.length - 1);
-  frameNode.width = innerW + FRAME_PAD_X * 2;
-  frameNode.height = innerH + FRAME_TITLE + FRAME_PAD_Y * 2;
+  if (shouldLayoutHorizontally(frameNode, frameChildren, ctx)) {
+    const innerW =
+      frameChildren.reduce((sum, c) => sum + c.width, 0) +
+      PAR_GUTTER * Math.max(0, frameChildren.length - 1);
+    const innerH = Math.max(...frameChildren.map((c) => c.height));
+    frameNode.width = innerW + FRAME_PAD_X * 2;
+    frameNode.height = innerH + FRAME_TITLE + FRAME_PAD_Y * 2;
+  } else {
+    const innerW = Math.max(...frameChildren.map((c) => c.width));
+    const innerH =
+      frameChildren.reduce((sum, c) => sum + c.height, 0) +
+      SEQ_GUTTER * Math.max(0, frameChildren.length - 1);
+    frameNode.width = innerW + FRAME_PAD_X * 2;
+    frameNode.height = innerH + FRAME_TITLE + FRAME_PAD_Y * 2;
+  }
 
   return frameNode;
 }
@@ -198,13 +239,27 @@ function positionChildren(node: LayoutNode, all: LayoutNode[]): void {
   const children = all.filter((n) => n.parentId === node.id);
   if (children.length === 0) return;
 
-  if (node.frameKind === "parallel") {
-    // Horizontal layout: branches side-by-side, top-aligned.
+  // Horizontal: parallel frames always, plus agent frames with all-compact kids.
+  // We infer the latter from the node's own sizing — frames sized horizontally
+  // have width == sum(children widths) + gutters + padding.
+  const horizontal =
+    node.frameKind === "parallel" ||
+    (node.frameKind === "agent" &&
+      approxEqual(
+        node.width,
+        children.reduce((sum, c) => sum + c.width, 0) +
+          PAR_GUTTER * Math.max(0, children.length - 1) +
+          FRAME_PAD_X * 2,
+      ));
+
+  if (horizontal) {
     let x = FRAME_PAD_X;
-    const y = FRAME_TITLE + FRAME_PAD_Y;
+    const innerHeight = node.height - FRAME_TITLE - FRAME_PAD_Y * 2;
+    const baseY = FRAME_TITLE + FRAME_PAD_Y;
     for (const c of children) {
       c.x = x;
-      c.y = y;
+      // Vertically center shorter children within the frame row.
+      c.y = baseY + Math.max(0, (innerHeight - c.height) / 2);
       positionChildren(c, all);
       x += c.width + PAR_GUTTER;
     }
@@ -220,6 +275,10 @@ function positionChildren(node: LayoutNode, all: LayoutNode[]): void {
     positionChildren(c, all);
     y += c.height + SEQ_GUTTER;
   }
+}
+
+function approxEqual(a: number, b: number): boolean {
+  return Math.abs(a - b) < 1;
 }
 
 function groupByParallel(siblings: TreeNode[]): TreeNode[][] {

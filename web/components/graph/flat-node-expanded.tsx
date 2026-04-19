@@ -37,7 +37,7 @@ export function FlatNodeExpanded({ data }: NodeProps<ExpandedNode>) {
       className="relative cursor-pointer flex flex-col"
       style={{
         width: layout.width,
-        height: 320,
+        height: layout.height,
         background: "var(--surface)",
         border: `1px solid ${selected ? "var(--accent)" : "var(--border)"}`,
         borderLeft: `3px solid ${isError ? "var(--warn)" : swatch.fg}`,
@@ -46,8 +46,10 @@ export function FlatNodeExpanded({ data }: NodeProps<ExpandedNode>) {
         overflow: "hidden",
       }}
     >
-      <Handle type="target" position={Position.Left} style={{ opacity: 0, pointerEvents: "none" }} />
-      <Handle type="source" position={Position.Right} style={{ opacity: 0, pointerEvents: "none" }} />
+      <Handle id="t-top" type="target" position={Position.Top} style={{ opacity: 0, pointerEvents: "none" }} />
+      <Handle id="t-left" type="target" position={Position.Left} style={{ opacity: 0, pointerEvents: "none" }} />
+      <Handle id="s-bottom" type="source" position={Position.Bottom} style={{ opacity: 0, pointerEvents: "none" }} />
+      <Handle id="s-right" type="source" position={Position.Right} style={{ opacity: 0, pointerEvents: "none" }} />
       <div
         className="px-3 py-2 flex items-center gap-2 border-b flex-shrink-0"
         style={{ borderBottomColor: "var(--border)" }}

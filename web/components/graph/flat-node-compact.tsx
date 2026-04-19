@@ -23,8 +23,10 @@ export function FlatNodeCompact({ data }: NodeProps<FlatStepNode>) {
 
   return (
     <>
-      <Handle type="target" position={Position.Top} style={{ opacity: 0, pointerEvents: "none" }} />
-      <Handle type="source" position={Position.Bottom} style={{ opacity: 0, pointerEvents: "none" }} />
+      <Handle id="t-top" type="target" position={Position.Top} style={{ opacity: 0, pointerEvents: "none" }} />
+      <Handle id="t-left" type="target" position={Position.Left} style={{ opacity: 0, pointerEvents: "none" }} />
+      <Handle id="s-bottom" type="source" position={Position.Bottom} style={{ opacity: 0, pointerEvents: "none" }} />
+      <Handle id="s-right" type="source" position={Position.Right} style={{ opacity: 0, pointerEvents: "none" }} />
     <div
       data-node-kind={nodeKind}
       data-selected={selected ? "true" : "false"}

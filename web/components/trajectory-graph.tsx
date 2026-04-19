@@ -40,8 +40,10 @@ function FrameNodeComp({ data }: NodeProps<FrameNode>) {
   if (frameKind === "parallel") {
     return (
       <>
-        <Handle type="target" position={Position.Top} style={{ opacity: 0, pointerEvents: "none" }} />
-        <Handle type="source" position={Position.Bottom} style={{ opacity: 0, pointerEvents: "none" }} />
+        <Handle id="t-top" type="target" position={Position.Top} style={{ opacity: 0, pointerEvents: "none" }} />
+        <Handle id="t-left" type="target" position={Position.Left} style={{ opacity: 0, pointerEvents: "none" }} />
+        <Handle id="s-bottom" type="source" position={Position.Bottom} style={{ opacity: 0, pointerEvents: "none" }} />
+        <Handle id="s-right" type="source" position={Position.Right} style={{ opacity: 0, pointerEvents: "none" }} />
         <div
           className="relative"
           style={{
@@ -67,8 +69,10 @@ function FrameNodeComp({ data }: NodeProps<FrameNode>) {
 
   return (
     <>
-      <Handle type="target" position={Position.Top} style={{ opacity: 0, pointerEvents: "none" }} />
-      <Handle type="source" position={Position.Bottom} style={{ opacity: 0, pointerEvents: "none" }} />
+      <Handle id="t-top" type="target" position={Position.Top} style={{ opacity: 0, pointerEvents: "none" }} />
+      <Handle id="t-left" type="target" position={Position.Left} style={{ opacity: 0, pointerEvents: "none" }} />
+      <Handle id="s-bottom" type="source" position={Position.Bottom} style={{ opacity: 0, pointerEvents: "none" }} />
+      <Handle id="s-right" type="source" position={Position.Right} style={{ opacity: 0, pointerEvents: "none" }} />
     <div
       className="relative"
       style={{
@@ -127,7 +131,9 @@ export function TrajectoryGraph({
   const { expandAll, expandedIds, toggleExpand, fsOpen } = useFullscreen();
   const rfEdges = useMemo(() => buildEdges(spans), [spans]);
   const { rfNodes } = useMemo(() => {
-    const { all } = buildSequenceLayout(spans);
+    // Pass expand state into layout so heights reflect the rendered size and
+    // nodes don't overlap.
+    const { all } = buildSequenceLayout(spans, { expandedIds, expandAll });
     const nodes: Node[] = all.map((ln) => {
       const isExpanded =
         ln.kind === "step" &&
@@ -141,8 +147,6 @@ export function TrajectoryGraph({
           ? "stepExpanded"
           : "step";
 
-      const height = isExpanded ? 320 : ln.height;
-
       return {
         id: ln.id,
         type,
@@ -153,7 +157,7 @@ export function TrajectoryGraph({
         selectable: ln.kind === "step",
         // Compound frame nodes must declare size so children can be positioned
         // relative to them; React Flow reads from style.width/height.
-        style: { width: ln.width, height },
+        style: { width: ln.width, height: ln.height },
         data: ln.kind === "step"
           ? ({
               layout: ln,
