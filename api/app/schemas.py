@@ -101,6 +101,8 @@ class AgentSummary(BaseModel):
     owner: Optional[str] = None
     github_url: Optional[str] = None
     language: Optional[str] = None
+    token_prefix: Optional[str] = None
+    last_token_used_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 

@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import re
+import uuid as _uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy import Integer, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.auth.agent_token import generate_token, hash_token
 from app.auth.deps import require_user
 from app.db import get_session
 from app.models import Agent, AgentVersion, Span, Trajectory
@@ -31,6 +34,19 @@ from app.schemas import (
 router = APIRouter(prefix="/api/agents")
 
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
+
+
+def _agent_to_dict(agent: Agent) -> dict:
+    """Serialize an Agent ORM row to the public summary shape."""
+    return AgentSummary.model_validate(agent).model_dump(mode="json")
+
+
+class AgentCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=255, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$")
+    display_name: str | None = None
+    description: str | None = None
+    language: str | None = None
+    github_url: str | None = None
 
 
 @router.get(
@@ -172,6 +188,98 @@ async def list_agents(
             )
         )
     return out
+
+
+@router.post("", status_code=201)
+async def create_agent(
+    payload: AgentCreate,
+    session: AsyncSession = Depends(get_session),
+    user=require_user(),
+) -> dict:
+    existing = (
+        await session.execute(
+            select(Agent).where(Agent.org_id == user.org_id, Agent.name == payload.name)
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        raise HTTPException(status_code=409, detail=f"agent {payload.name!r} already exists")
+    token, prefix = generate_token()
+    agent = Agent(
+        org_id=user.org_id,
+        signature=f"registered:{_uuid.uuid4()}",
+        name=payload.name,
+        display_name=payload.display_name,
+        description=payload.description,
+        language=payload.language,
+        github_url=payload.github_url,
+        token_hash=hash_token(token),
+        token_prefix=prefix,
+        created_by_user_id=user.id,
+    )
+    session.add(agent)
+    await session.commit()
+    await session.refresh(agent)
+    return {"agent": _agent_to_dict(agent), "token": token}
+
+
+@router.post("/{name}/rotate-token")
+async def rotate_token(
+    name: str,
+    session: AsyncSession = Depends(get_session),
+    user=require_user(),
+) -> dict:
+    agent = (
+        await session.execute(
+            select(Agent).where(Agent.org_id == user.org_id, Agent.name == name)
+        )
+    ).scalar_one_or_none()
+    if agent is None:
+        raise HTTPException(status_code=404, detail="agent not found")
+    token, prefix = generate_token()
+    agent.token_hash = hash_token(token)
+    agent.token_prefix = prefix
+    agent.last_token_used_at = None
+    await session.commit()
+    return {"token": token, "token_prefix": prefix}
+
+
+@router.post("/{name}/issue-token")
+async def issue_token(
+    name: str,
+    session: AsyncSession = Depends(get_session),
+    user=require_user(),
+) -> dict:
+    agent = (
+        await session.execute(
+            select(Agent).where(Agent.org_id == user.org_id, Agent.name == name)
+        )
+    ).scalar_one_or_none()
+    if agent is None:
+        raise HTTPException(status_code=404, detail="agent not found")
+    if agent.token_hash is not None:
+        raise HTTPException(status_code=409, detail="agent already has a token; rotate instead")
+    token, prefix = generate_token()
+    agent.token_hash = hash_token(token)
+    agent.token_prefix = prefix
+    await session.commit()
+    return {"token": token, "token_prefix": prefix}
+
+
+@router.delete("/{name}", status_code=204)
+async def delete_agent(
+    name: str,
+    session: AsyncSession = Depends(get_session),
+    user=require_user(),
+) -> None:
+    agent = (
+        await session.execute(
+            select(Agent).where(Agent.org_id == user.org_id, Agent.name == name)
+        )
+    ).scalar_one_or_none()
+    if agent is None:
+        raise HTTPException(status_code=404, detail="agent not found")
+    await session.delete(agent)
+    await session.commit()
 
 
 @router.get("/{name}", response_model=AgentDetail)
