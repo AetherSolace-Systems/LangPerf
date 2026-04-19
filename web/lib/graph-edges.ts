@@ -29,6 +29,8 @@ export function buildEdges(spans: Span[]): Edge<LabelledEdgeData>[] {
         id: `e-${from.span_id}-${to.span_id}`,
         source: from.span_id,
         target: to.span_id,
+        sourceHandle: "s-br",
+        targetHandle: "t-tl",
         type: "labelled",
         data: { label, payload },
       });

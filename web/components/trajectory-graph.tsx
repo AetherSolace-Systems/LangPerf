@@ -40,10 +40,8 @@ function FrameNodeComp({ data }: NodeProps<FrameNode>) {
   if (frameKind === "parallel") {
     return (
       <>
-        <Handle id="t-top" type="target" position={Position.Top} style={{ opacity: 0, pointerEvents: "none" }} />
-        <Handle id="t-left" type="target" position={Position.Left} style={{ opacity: 0, pointerEvents: "none" }} />
-        <Handle id="s-bottom" type="source" position={Position.Bottom} style={{ opacity: 0, pointerEvents: "none" }} />
-        <Handle id="s-right" type="source" position={Position.Right} style={{ opacity: 0, pointerEvents: "none" }} />
+        <Handle id="t-tl" type="target" position={Position.Left} style={{ top: 10, opacity: 0, pointerEvents: "none" }} />
+        <Handle id="s-br" type="source" position={Position.Right} style={{ top: "calc(100% - 10px)", opacity: 0, pointerEvents: "none" }} />
         <div
           className="relative"
           style={{
@@ -69,10 +67,8 @@ function FrameNodeComp({ data }: NodeProps<FrameNode>) {
 
   return (
     <>
-      <Handle id="t-top" type="target" position={Position.Top} style={{ opacity: 0, pointerEvents: "none" }} />
-      <Handle id="t-left" type="target" position={Position.Left} style={{ opacity: 0, pointerEvents: "none" }} />
-      <Handle id="s-bottom" type="source" position={Position.Bottom} style={{ opacity: 0, pointerEvents: "none" }} />
-      <Handle id="s-right" type="source" position={Position.Right} style={{ opacity: 0, pointerEvents: "none" }} />
+      <Handle id="t-tl" type="target" position={Position.Left} style={{ top: 10, opacity: 0, pointerEvents: "none" }} />
+      <Handle id="s-br" type="source" position={Position.Right} style={{ top: "calc(100% - 10px)", opacity: 0, pointerEvents: "none" }} />
     <div
       className="relative"
       style={{

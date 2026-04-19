@@ -24,10 +24,9 @@ export function FlatNodeCompact({ data }: NodeProps<FlatStepNode>) {
 
   return (
     <>
-      <Handle id="t-top" type="target" position={Position.Top} style={{ opacity: 0, pointerEvents: "none" }} />
-      <Handle id="t-left" type="target" position={Position.Left} style={{ opacity: 0, pointerEvents: "none" }} />
-      <Handle id="s-bottom" type="source" position={Position.Bottom} style={{ opacity: 0, pointerEvents: "none" }} />
-      <Handle id="s-right" type="source" position={Position.Right} style={{ opacity: 0, pointerEvents: "none" }} />
+      {/* Edges anchor to these two corner handles only (see lib/graph-edges.ts). */}
+      <Handle id="t-tl" type="target" position={Position.Left} style={{ top: 8, opacity: 0, pointerEvents: "none" }} />
+      <Handle id="s-br" type="source" position={Position.Right} style={{ top: "calc(100% - 8px)", opacity: 0, pointerEvents: "none" }} />
     <div
       data-node-kind={nodeKind}
       data-selected={selected ? "true" : "false"}
