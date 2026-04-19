@@ -59,8 +59,8 @@ def upgrade() -> None:
         ),
         sa.Column("body", sa.Text, nullable=False),
         sa.Column("resolved", sa.Boolean, nullable=False, server_default=sa.text("false")),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
     )
 
     # 2. Create indexes on comments
@@ -103,7 +103,7 @@ def upgrade() -> None:
         sa.Column("kind", sa.String(64), nullable=False),
         sa.Column("payload", JSONB, nullable=False, server_default=sa.text("'{}'")),
         sa.Column("read_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
     )
     op.create_index("ix_notifications_user_id", "notifications", ["user_id"])
 
@@ -131,7 +131,7 @@ def upgrade() -> None:
         ),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("revoked", sa.Boolean, nullable=False, server_default=sa.text("false")),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
     )
 
     # 6. Create failure_modes table
@@ -147,7 +147,7 @@ def upgrade() -> None:
         sa.Column("slug", sa.String(64), nullable=False),
         sa.Column("label", sa.String(255), nullable=False),
         sa.Column("color", sa.String(32), nullable=False, server_default=sa.text("'steel-mist'")),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
         sa.UniqueConstraint("org_id", "slug", name="uq_failure_modes_org_slug"),
     )
 
@@ -172,7 +172,7 @@ def upgrade() -> None:
             sa.ForeignKey("users.id", ondelete="CASCADE"),
             nullable=False,
         ),
-        sa.Column("tagged_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("tagged_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
     )
 
     # 8. Add assigned_user_id to trajectories

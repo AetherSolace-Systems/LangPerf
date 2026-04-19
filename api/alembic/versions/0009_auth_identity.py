@@ -23,7 +23,7 @@ def upgrade() -> None:
         sa.Column("id", PgUUID(as_uuid=True), primary_key=True),
         sa.Column("name", sa.String(255), nullable=False),
         sa.Column("slug", sa.String(255), nullable=False, unique=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
     )
     op.create_table(
         "users",
@@ -40,7 +40,7 @@ def upgrade() -> None:
         sa.Column(
             "is_admin", sa.Boolean, nullable=False, server_default=sa.text("false")
         ),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
         sa.UniqueConstraint("org_id", "email", name="uq_users_org_email"),
     )
     op.create_table(
@@ -52,7 +52,7 @@ def upgrade() -> None:
             sa.ForeignKey("users.id", ondelete="CASCADE"),
             nullable=False,
         ),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
     )
 

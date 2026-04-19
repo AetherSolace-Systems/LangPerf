@@ -11,15 +11,8 @@ from app.auth.mode import is_single_user_mode
 from app.auth.password import hash_password, verify_password
 from app.auth.session import create_session, delete_session
 from app.db import get_session
-from app.models import FailureMode, Organization, User
-
-DEFAULT_FAILURE_MODES = [
-    ("wrong_tool", "Wrong tool", "warn"),
-    ("bad_args", "Bad args", "warn"),
-    ("hallucination", "Hallucination", "peach-neon"),
-    ("loop", "Loop", "peach-neon"),
-    ("misunderstood_intent", "Misunderstood intent", "steel-mist"),
-]
+from app.ingest.org import get_default_org_id
+from app.models import User
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -76,22 +69,18 @@ async def signup(
     if existing.scalar_one_or_none() is not None:
         raise HTTPException(status_code=403, detail="signup closed; ask an admin for an invite")
 
-    org = Organization(id=str(uuid.uuid4()), name="default", slug="default")
-    session.add(org)
-    await session.flush()
+    # Reuse the migration-seeded default org (one org per deployment in v2).
+    # Failure modes for this org are already seeded by migration 0010.
+    org_id = await get_default_org_id(session)
     user = User(
         id=str(uuid.uuid4()),
-        org_id=org.id,
+        org_id=org_id,
         email=payload.email.lower(),
         password_hash=hash_password(payload.password),
         display_name=payload.display_name,
         is_admin=True,
     )
     session.add(user)
-    await session.flush()
-    # Seed default failure modes for the new org
-    for slug, label, color in DEFAULT_FAILURE_MODES:
-        session.add(FailureMode(org_id=org.id, slug=slug, label=label, color=color))
     await session.flush()
     sess = await create_session(session, user.id)
     response.set_cookie(value=sess.token, **COOKIE_KW)
