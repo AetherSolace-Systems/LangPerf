@@ -13,78 +13,21 @@ import {
 } from "@xyflow/react";
 
 import type { Span } from "@/lib/api";
-import { DRIFT, KIND_GLYPH, KIND_LABEL, kindSwatch } from "@/lib/colors";
+import { KIND_GLYPH, KIND_LABEL, kindSwatch } from "@/lib/colors";
+import { FlatNodeCompact, type FlatStepData } from "@/components/graph/flat-node-compact";
 import { GraphToolbar } from "@/components/graph/graph-toolbar";
+import { useFullscreen } from "@/components/graph/fullscreen-context";
 import { useSelection } from "@/components/selection-context";
 import { fmtDuration, fmtTokens } from "@/lib/format";
 import { buildSequenceLayout, type LayoutNode } from "@/lib/sequence-layout";
 import { extractTotalTokens } from "@/lib/span-fields";
 
-type StepData = { layout: LayoutNode; selected: boolean };
 type FrameData = { layout: LayoutNode; selected: boolean };
-
-type StepNode = Node<StepData, "step">;
 type FrameNode = Node<FrameData, "frame">;
-
-function StepNodeComp({ data }: NodeProps<StepNode>) {
-  const { layout, selected } = data;
-  const { span, nodeKind, execOrder } = layout;
-  const swatch = kindSwatch(nodeKind);
-  const tokens = extractTotalTokens(span);
-  const isError = span?.status_code === "ERROR";
-
-  // LLM calls are pills; everything else is a rounded rect.
-  const radius = nodeKind === "llm" ? 999 : 10;
-
-  return (
-    <div
-      className="relative transition-colors cursor-pointer"
-      style={{
-        width: layout.width,
-        height: layout.height,
-        borderRadius: radius,
-        border: `2px solid ${selected ? DRIFT.marigold : swatch.border}`,
-        background: "var(--surface)",
-        boxShadow: selected ? `0 0 0 2px ${DRIFT.marigold}44` : undefined,
-      }}
-    >
-      <div className="h-full px-3 py-2 flex items-center gap-2.5">
-        {execOrder ? (
-          <div
-            className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-mono tabular-nums font-semibold flex-shrink-0"
-            style={{ background: DRIFT.marigold, color: DRIFT.midnight }}
-          >
-            {execOrder}
-          </div>
-        ) : null}
-        <div className="min-w-0 flex-1">
-          <div
-            className="text-[9px] uppercase tracking-wider font-mono flex items-center gap-1"
-            style={{ color: swatch.fg }}
-          >
-            <span>{KIND_GLYPH[nodeKind] ?? "•"}</span>
-            <span>{KIND_LABEL[nodeKind] ?? nodeKind}</span>
-          </div>
-          <div className="text-[12px] font-medium text-linen truncate mt-0.5">
-            {layout.label}
-          </div>
-        </div>
-        <div className="flex flex-col items-end text-[9px] font-mono tabular-nums text-twilight flex-shrink-0">
-          {tokens != null ? <div>{fmtTokens(tokens)}t</div> : null}
-          <div>{fmtDuration(span?.duration_ms ?? null)}</div>
-        </div>
-        {isError ? (
-          <span className="absolute -top-1 -right-1 text-coral text-sm">!</span>
-        ) : null}
-      </div>
-    </div>
-  );
-}
 
 function FrameNodeComp({ data }: NodeProps<FrameNode>) {
   const { layout, selected } = data;
   const { frameKind, label, span, nodeKind } = layout;
-
   const tokens = extractTotalTokens(span);
   const duration = span?.duration_ms ?? null;
 
@@ -95,14 +38,14 @@ function FrameNodeComp({ data }: NodeProps<FrameNode>) {
         style={{
           width: layout.width,
           height: layout.height,
-          borderRadius: 10,
-          border: `1.5px dashed ${DRIFT.twilight}`,
-          background: "rgba(31,32,53,0.35)",
+          border: "1px dashed var(--border-strong)",
+          background: "transparent",
+          borderRadius: 6,
         }}
       >
         <div
-          className="absolute -top-2.5 left-4 px-2 text-[9px] font-mono uppercase tracking-wider"
-          style={{ background: DRIFT.midnight, color: DRIFT.twilight }}
+          className="absolute -top-2 left-3 px-1.5 text-[9px] font-mono uppercase tracking-wider"
+          style={{ background: "var(--background)", color: "var(--muted)" }}
         >
           ∥ {label}
         </div>
@@ -110,10 +53,7 @@ function FrameNodeComp({ data }: NodeProps<FrameNode>) {
     );
   }
 
-  // agent / trajectory / generic container
   const swatch = kindSwatch(nodeKind);
-  const borderColor = selected ? DRIFT.marigold : swatch.border;
-  const titleBg = `linear-gradient(to bottom, ${swatch.bg}, transparent)`;
 
   return (
     <div
@@ -121,17 +61,18 @@ function FrameNodeComp({ data }: NodeProps<FrameNode>) {
       style={{
         width: layout.width,
         height: layout.height,
-        borderRadius: 12,
-        border: `2px solid ${borderColor}`,
-        background: "rgba(20,20,31,0.55)",
+        border: `1px solid ${selected ? "var(--accent)" : "var(--border)"}`,
+        borderLeft: `3px solid ${swatch.fg}`,
+        background: "transparent",
+        borderRadius: 6,
       }}
     >
       <div
-        className="absolute top-0 left-0 right-0 rounded-t-[10px] border-b px-3 flex items-center gap-2"
+        className="absolute top-0 left-0 right-0 px-3 flex items-center gap-2 border-b"
         style={{
-          height: 34,
-          background: titleBg,
-          borderColor: swatch.border,
+          height: 30,
+          background: "var(--surface-2)",
+          borderBottomColor: "var(--border)",
         }}
       >
         <span style={{ color: swatch.fg }} className="text-sm leading-none">
@@ -143,8 +84,8 @@ function FrameNodeComp({ data }: NodeProps<FrameNode>) {
         >
           {KIND_LABEL[nodeKind] ?? nodeKind}
         </span>
-        <span className="text-sm font-medium text-linen truncate">{label}</span>
-        <div className="ml-auto flex items-center gap-3 text-[10px] font-mono tabular-nums text-twilight">
+        <span className="text-sm font-medium text-warm-fog truncate">{label}</span>
+        <div className="ml-auto flex items-center gap-3 text-[10px] font-mono tabular-nums text-warm-fog/60">
           {tokens != null ? <span>{fmtTokens(tokens)}t</span> : null}
           {duration != null ? <span>{fmtDuration(duration)}</span> : null}
         </div>
@@ -154,12 +95,13 @@ function FrameNodeComp({ data }: NodeProps<FrameNode>) {
 }
 
 const nodeTypes = {
-  step: StepNodeComp,
+  step: FlatNodeCompact,
   frame: FrameNodeComp,
 };
 
 export function TrajectoryGraph({ spans }: { spans: Span[] }) {
   const { selectedId, select } = useSelection();
+  const { toggleExpand } = useFullscreen();
   const { rfNodes } = useMemo(() => {
     const { all } = buildSequenceLayout(spans);
     const nodes: Node[] = all.map((ln) => ({
@@ -173,10 +115,17 @@ export function TrajectoryGraph({ spans }: { spans: Span[] }) {
       // Compound frame nodes must declare size so children can be positioned
       // relative to them; React Flow reads from style.width/height.
       style: { width: ln.width, height: ln.height },
-      data: {
-        layout: ln,
-        selected: ln.span?.span_id === selectedId,
-      } satisfies StepData | FrameData,
+      data: ln.kind === "step"
+        ? ({
+            layout: ln,
+            selected: ln.span?.span_id === selectedId,
+            commentCount: 0, // wired in Task 6
+            onToggle: () => ln.span && toggleExpand(ln.span.span_id),
+          } satisfies FlatStepData)
+        : ({
+            layout: ln,
+            selected: ln.span?.span_id === selectedId,
+          } satisfies FrameData),
       // Frames must render first so children render on top. React Flow
       // respects node order in the array for z-ordering.
       zIndex: ln.kind === "frame"
@@ -186,7 +135,7 @@ export function TrajectoryGraph({ spans }: { spans: Span[] }) {
     // Sort: frames first (by depth ascending), steps last.
     nodes.sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
     return { rfNodes: nodes };
-  }, [spans, selectedId]);
+  }, [spans, selectedId, toggleExpand]);
 
   if (rfNodes.length === 0) {
     return <div className="p-6 text-sm text-twilight">No spans to graph.</div>;
@@ -205,7 +154,7 @@ export function TrajectoryGraph({ spans }: { spans: Span[] }) {
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
         onNodeClick={(_, n) => {
-          const layout = (n.data as StepData | FrameData).layout;
+          const layout = (n.data as FlatStepData | FrameData).layout;
           if (layout.span) select(layout.span);
         }}
         nodesDraggable={false}
