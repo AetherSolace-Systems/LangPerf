@@ -115,7 +115,13 @@ const nodeTypes = {
 
 const edgeTypes = { labelled: LabelledEdge };
 
-export function TrajectoryGraph({ spans }: { spans: Span[] }) {
+export function TrajectoryGraph({
+  spans,
+  commentCounts,
+}: {
+  spans: Span[];
+  commentCounts?: Map<string, number>;
+}) {
   const { selectedId, select } = useSelection();
   const { expandAll, expandedIds, toggleExpand } = useFullscreen();
   const rfEdges = useMemo(() => buildEdges(spans), [spans]);
@@ -151,7 +157,7 @@ export function TrajectoryGraph({ spans }: { spans: Span[] }) {
           ? ({
               layout: ln,
               selected: ln.span?.span_id === selectedId,
-              commentCount: 0, // wired in Task 6
+              commentCount: ln.span ? commentCounts?.get(ln.span.span_id) ?? 0 : 0,
               onToggle: () => ln.span && toggleExpand(ln.span.span_id),
             } satisfies FlatStepData | FlatStepExpandedData)
           : ({
@@ -168,7 +174,7 @@ export function TrajectoryGraph({ spans }: { spans: Span[] }) {
     // Sort: frames first (by depth ascending), steps last.
     nodes.sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
     return { rfNodes: nodes };
-  }, [spans, selectedId, toggleExpand, expandAll, expandedIds]);
+  }, [spans, selectedId, toggleExpand, expandAll, expandedIds, commentCounts]);
 
   if (rfNodes.length === 0) {
     return <div className="p-6 text-sm text-twilight">No spans to graph.</div>;

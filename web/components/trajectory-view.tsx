@@ -11,6 +11,7 @@ import { FullscreenProvider } from "@/components/graph/fullscreen-context";
 import { SelectionProvider } from "@/components/selection-context";
 import { TagSelector } from "@/components/tag-selector";
 import { TrajectoryGraph } from "@/components/trajectory-graph";
+import { useCommentCounts } from "@/lib/comment-counts";
 import { TrajectoryTimeline } from "@/components/trajectory-timeline";
 import { TrajectoryTree } from "@/components/trajectory-tree";
 
@@ -20,6 +21,7 @@ export function TrajectoryView({ trajectory }: { trajectory: TrajectoryDetail })
   const firstSpanId = trajectory.spans[0]?.span_id ?? null;
   const [notesOpen, setNotesOpen] = useState<boolean>(!!trajectory.notes);
   const [lowerView, setLowerView] = useState<LowerView>("timeline");
+  const commentCounts = useCommentCounts(trajectory);
 
   return (
     <SelectionProvider spans={trajectory.spans} initialId={firstSpanId}>
@@ -114,7 +116,7 @@ export function TrajectoryView({ trajectory }: { trajectory: TrajectoryDetail })
               />
               <div className="flex-1 min-h-0">
                 {lowerView === "graph" ? (
-                  <TrajectoryGraph spans={trajectory.spans} />
+                  <TrajectoryGraph spans={trajectory.spans} commentCounts={commentCounts} />
                 ) : (
                   <TrajectoryTimeline spans={trajectory.spans} />
                 )}
