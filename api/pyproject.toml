@@ -24,6 +24,8 @@ dev = [
   "httpx>=0.27",
   "aiosqlite>=0.20",
   "greenlet>=3.0",
+  "ruff>=0.6",
+  "mypy>=1.11",
 ]
 
 [build-system]
@@ -37,3 +39,45 @@ include = ["app*"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+# Start conservative — only rules that pass today.
+# E/W = pycodestyle, F = pyflakes, I = isort, UP = pyupgrade,
+# B = flake8-bugbear (real bugs).
+select = ["E", "W", "F", "I", "UP", "B"]
+ignore = [
+  "E501",  # handled by formatter
+  "B008",  # FastAPI Depends() in defaults is idiomatic
+  # --- Baseline ignores: existing violations, tighten later ---
+  "E702",  # multiple statements on one line — common in tests (`x = X(); y = Y()`)
+  "I001",  # un-sorted imports — don't churn existing import blocks
+  "F401",  # unused imports — many are intentional re-exports
+  "UP007", # `Optional[X]` vs `X | None` — stylistic, existing code uses both
+  "UP017", # `datetime.timezone.utc` vs `datetime.UTC` — stylistic
+  "UP035", # `typing.Callable` vs `collections.abc.Callable` — stylistic
+  "UP037", # quoted type annotations — stylistic
+  "UP041", # `asyncio.TimeoutError` → `TimeoutError` — stylistic
+  "UP012", # unnecessary UTF-8 encoding arg — stylistic
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["B011"]          # assert False in tests is fine
+"**/alembic/versions/**" = ["E402", "F401", "I"]  # migrations are frozen
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.12"
+# Lax to start — tighten later. No strict mode.
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+check_untyped_defs = false
+ignore_missing_imports = true
+# Don't check third-party stubs we don't control
+exclude = ["alembic/versions/", "tests/"]
