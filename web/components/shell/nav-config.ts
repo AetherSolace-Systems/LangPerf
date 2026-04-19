@@ -15,7 +15,7 @@ export type RailItem = {
 };
 
 export const RAIL_ITEMS: RailItem[] = [
-  { id: "home",     label: "home",    glyph: "□", href: "/",          group: "primary" },
+  { id: "home",     label: "dash",    glyph: "□", href: "/",          group: "primary" },
   { id: "agents",   label: "agents",  glyph: "◇", href: "/agents",    group: "primary" },
   { id: "history",  label: "history", glyph: "≡", href: "/history",   group: "primary" },
   { id: "logs",     label: "logs",    glyph: "⌘", href: "/logs",      group: "primary" },
@@ -40,7 +40,6 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: "agents-review",  label: "Agents · auto-detected", href: "/settings/agents-review", group: "workspace" },
   { id: "log-forwarding", label: "Log forwarding",      href: "/settings/log-forwarding",  group: "observability" },
   { id: "trace-export",   label: "Agent trace export",  href: "/settings/trace-export",    group: "observability" },
-  { id: "sdk-keys",       label: "SDK keys",            href: "/settings/sdk-keys",        group: "integrations" },
   { id: "webhooks",       label: "Webhooks",            href: "/settings/webhooks",        group: "integrations" },
   { id: "users-org",      label: "Users & org",         href: "#",                          group: "later", v2: true },
   { id: "billing",        label: "Billing",             href: "#",                          group: "later", v2: true },

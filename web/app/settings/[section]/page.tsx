@@ -78,7 +78,6 @@ export default async function SettingsSection({
     "profile": "Phase 2+ — single-user placeholder in v1.",
     "environments": "Phase 2 — rename and order your dev/staging/prod environments.",
     "agents-review": "Phase 2 — queue of auto-detected agents needing human review.",
-    "sdk-keys": "Follow-up — SDK key rotation for authenticated ingest.",
     "webhooks": "Follow-up — outbound webhooks on run events.",
   };
 
