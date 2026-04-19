@@ -17,6 +17,7 @@ import {
 import type { Span } from "@/lib/api";
 import { KIND_GLYPH, KIND_LABEL, kindSwatch } from "@/lib/colors";
 import { FlatNodeCompact, type FlatStepData } from "@/components/graph/flat-node-compact";
+import { FlatNodeExpanded, type FlatStepExpandedData } from "@/components/graph/flat-node-expanded";
 import { GraphToolbar } from "@/components/graph/graph-toolbar";
 import { LabelledEdge } from "@/components/graph/labelled-edge";
 import { useFullscreen } from "@/components/graph/fullscreen-context";
@@ -108,6 +109,7 @@ function FrameNodeComp({ data }: NodeProps<FrameNode>) {
 
 const nodeTypes = {
   step: FlatNodeCompact,
+  stepExpanded: FlatNodeExpanded,
   frame: FrameNodeComp,
 };
 
@@ -115,42 +117,58 @@ const edgeTypes = { labelled: LabelledEdge };
 
 export function TrajectoryGraph({ spans }: { spans: Span[] }) {
   const { selectedId, select } = useSelection();
-  const { toggleExpand } = useFullscreen();
+  const { expandAll, expandedIds, toggleExpand } = useFullscreen();
   const rfEdges = useMemo(() => buildEdges(spans), [spans]);
   const { rfNodes } = useMemo(() => {
     const { all } = buildSequenceLayout(spans);
-    const nodes: Node[] = all.map((ln) => ({
-      id: ln.id,
-      type: ln.kind, // "step" | "frame"
-      position: { x: ln.x, y: ln.y },
-      parentId: ln.parentId ?? undefined,
-      extent: ln.parentId ? "parent" : undefined,
-      draggable: false,
-      selectable: ln.kind === "step",
-      // Compound frame nodes must declare size so children can be positioned
-      // relative to them; React Flow reads from style.width/height.
-      style: { width: ln.width, height: ln.height },
-      data: ln.kind === "step"
-        ? ({
-            layout: ln,
-            selected: ln.span?.span_id === selectedId,
-            commentCount: 0, // wired in Task 6
-            onToggle: () => ln.span && toggleExpand(ln.span.span_id),
-          } satisfies FlatStepData)
-        : ({
-            layout: ln,
-            selected: ln.span?.span_id === selectedId,
-          } satisfies FrameData),
-      // Frames must render first so children render on top. React Flow
-      // respects node order in the array for z-ordering.
-      zIndex: ln.kind === "frame"
-        ? (ln.frameKind === "parallel" ? 1 : 0)
-        : 10,
-    }));
+    const nodes: Node[] = all.map((ln) => {
+      const isExpanded =
+        ln.kind === "step" &&
+        !!ln.span &&
+        (expandAll || expandedIds.has(ln.span.span_id));
+
+      const type =
+        ln.kind === "frame"
+          ? "frame"
+          : isExpanded
+          ? "stepExpanded"
+          : "step";
+
+      const height = isExpanded ? 320 : ln.height;
+
+      return {
+        id: ln.id,
+        type,
+        position: { x: ln.x, y: ln.y },
+        parentId: ln.parentId ?? undefined,
+        extent: ln.parentId ? ("parent" as const) : undefined,
+        draggable: false,
+        selectable: ln.kind === "step",
+        // Compound frame nodes must declare size so children can be positioned
+        // relative to them; React Flow reads from style.width/height.
+        style: { width: ln.width, height },
+        data: ln.kind === "step"
+          ? ({
+              layout: ln,
+              selected: ln.span?.span_id === selectedId,
+              commentCount: 0, // wired in Task 6
+              onToggle: () => ln.span && toggleExpand(ln.span.span_id),
+            } satisfies FlatStepData | FlatStepExpandedData)
+          : ({
+              layout: ln,
+              selected: ln.span?.span_id === selectedId,
+            } satisfies FrameData),
+        // Frames must render first so children render on top. React Flow
+        // respects node order in the array for z-ordering.
+        zIndex: ln.kind === "frame"
+          ? (ln.frameKind === "parallel" ? 1 : 0)
+          : 10,
+      };
+    });
     // Sort: frames first (by depth ascending), steps last.
     nodes.sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
     return { rfNodes: nodes };
-  }, [spans, selectedId, toggleExpand]);
+  }, [spans, selectedId, toggleExpand, expandAll, expandedIds]);
 
   if (rfNodes.length === 0) {
     return <div className="p-6 text-sm text-twilight">No spans to graph.</div>;
