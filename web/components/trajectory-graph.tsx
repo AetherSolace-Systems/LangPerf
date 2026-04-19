@@ -26,6 +26,7 @@ import { fmtDuration, fmtTokens } from "@/lib/format";
 import { buildSequenceLayout, type LayoutNode } from "@/lib/sequence-layout";
 import { extractTotalTokens } from "@/lib/span-fields";
 import { buildEdges } from "@/lib/graph-edges";
+import { FloatingInspector } from "@/components/graph/floating-inspector";
 
 type FrameData = { layout: LayoutNode; selected: boolean };
 type FrameNode = Node<FrameData, "frame">;
@@ -123,7 +124,7 @@ export function TrajectoryGraph({
   commentCounts?: Map<string, number>;
 }) {
   const { selectedId, select } = useSelection();
-  const { expandAll, expandedIds, toggleExpand } = useFullscreen();
+  const { expandAll, expandedIds, toggleExpand, fsOpen } = useFullscreen();
   const rfEdges = useMemo(() => buildEdges(spans), [spans]);
   const { rfNodes } = useMemo(() => {
     const { all } = buildSequenceLayout(spans);
@@ -214,6 +215,9 @@ export function TrajectoryGraph({
           className="!bg-deep-indigo !border !border-[color:var(--border)] !shadow-none [&_button]:!bg-deep-indigo [&_button]:!border-[color:var(--border)] [&_button]:!text-linen [&_button]:!fill-linen [&_button:hover]:!bg-aether-teal/20"
         />
       </ReactFlow>
+      {fsOpen ? (
+        <FloatingInspector onOpenFull={() => { /* v1: no-op. v-next: drive sidebar open + tab=detail. */ }} />
+      ) : null}
     </div>
   );
 }
