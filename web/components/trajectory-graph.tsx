@@ -7,6 +7,8 @@ import {
   Background,
   BackgroundVariant,
   Controls,
+  Handle,
+  Position,
   ReactFlow,
   type Node,
   type NodeProps,
@@ -16,11 +18,13 @@ import type { Span } from "@/lib/api";
 import { KIND_GLYPH, KIND_LABEL, kindSwatch } from "@/lib/colors";
 import { FlatNodeCompact, type FlatStepData } from "@/components/graph/flat-node-compact";
 import { GraphToolbar } from "@/components/graph/graph-toolbar";
+import { LabelledEdge } from "@/components/graph/labelled-edge";
 import { useFullscreen } from "@/components/graph/fullscreen-context";
 import { useSelection } from "@/components/selection-context";
 import { fmtDuration, fmtTokens } from "@/lib/format";
 import { buildSequenceLayout, type LayoutNode } from "@/lib/sequence-layout";
 import { extractTotalTokens } from "@/lib/span-fields";
+import { buildEdges } from "@/lib/graph-edges";
 
 type FrameData = { layout: LayoutNode; selected: boolean };
 type FrameNode = Node<FrameData, "frame">;
@@ -33,29 +37,36 @@ function FrameNodeComp({ data }: NodeProps<FrameNode>) {
 
   if (frameKind === "parallel") {
     return (
-      <div
-        className="relative"
-        style={{
-          width: layout.width,
-          height: layout.height,
-          border: "1px dashed var(--border-strong)",
-          background: "transparent",
-          borderRadius: 6,
-        }}
-      >
+      <>
+        <Handle type="target" position={Position.Top} style={{ opacity: 0, pointerEvents: "none" }} />
+        <Handle type="source" position={Position.Bottom} style={{ opacity: 0, pointerEvents: "none" }} />
         <div
-          className="absolute -top-2 left-3 px-1.5 text-[9px] font-mono uppercase tracking-wider"
-          style={{ background: "var(--background)", color: "var(--muted)" }}
+          className="relative"
+          style={{
+            width: layout.width,
+            height: layout.height,
+            border: "1px dashed var(--border-strong)",
+            background: "transparent",
+            borderRadius: 6,
+          }}
         >
-          ∥ {label}
+          <div
+            className="absolute -top-2 left-3 px-1.5 text-[9px] font-mono uppercase tracking-wider"
+            style={{ background: "var(--background)", color: "var(--muted)" }}
+          >
+            ∥ {label}
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   const swatch = kindSwatch(nodeKind);
 
   return (
+    <>
+      <Handle type="target" position={Position.Top} style={{ opacity: 0, pointerEvents: "none" }} />
+      <Handle type="source" position={Position.Bottom} style={{ opacity: 0, pointerEvents: "none" }} />
     <div
       className="relative"
       style={{
@@ -91,6 +102,7 @@ function FrameNodeComp({ data }: NodeProps<FrameNode>) {
         </div>
       </div>
     </div>
+    </>
   );
 }
 
@@ -99,9 +111,12 @@ const nodeTypes = {
   frame: FrameNodeComp,
 };
 
+const edgeTypes = { labelled: LabelledEdge };
+
 export function TrajectoryGraph({ spans }: { spans: Span[] }) {
   const { selectedId, select } = useSelection();
   const { toggleExpand } = useFullscreen();
+  const rfEdges = useMemo(() => buildEdges(spans), [spans]);
   const { rfNodes } = useMemo(() => {
     const { all } = buildSequenceLayout(spans);
     const nodes: Node[] = all.map((ln) => ({
@@ -146,8 +161,9 @@ export function TrajectoryGraph({ spans }: { spans: Span[] }) {
       <GraphToolbar />
       <ReactFlow
         nodes={rfNodes}
-        edges={[]}
+        edges={rfEdges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         fitView
         fitViewOptions={{ padding: 0.12 }}
         minZoom={0.15}

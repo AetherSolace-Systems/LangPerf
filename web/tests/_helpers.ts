@@ -27,3 +27,24 @@ export async function firstRunId(page: Page): Promise<string> {
   }
   return body.items[0].id;
 }
+
+/**
+ * Fetch a trajectory id that has at least `minSteps` spans, so graph tests
+ * can be sure there are sibling nodes (and therefore edges).
+ */
+export async function firstRunIdWithMinSteps(
+  page: Page,
+  minSteps = 3,
+): Promise<string> {
+  const resp = await page.request.get(`${API_BASE}/api/runs?limit=50`);
+  const body = (await resp.json()) as {
+    items: { id: string; step_count: number }[];
+  };
+  const match = body.items.find((r) => r.step_count >= minSteps);
+  if (!match) {
+    throw new Error(
+      `no runs with step_count >= ${minSteps} — seed data is missing`,
+    );
+  }
+  return match.id;
+}

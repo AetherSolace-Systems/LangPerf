@@ -1,6 +1,6 @@
 "use client";
 
-import type { NodeProps, Node } from "@xyflow/react";
+import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import type { LayoutNode } from "@/lib/sequence-layout";
 import { KIND_GLYPH, KIND_LABEL, kindSwatch } from "@/lib/colors";
 import { fmtDuration, fmtTokens } from "@/lib/format";
@@ -22,6 +22,9 @@ export function FlatNodeCompact({ data }: NodeProps<FlatStepNode>) {
   const isError = span?.status_code === "ERROR";
 
   return (
+    <>
+      <Handle type="target" position={Position.Top} style={{ opacity: 0, pointerEvents: "none" }} />
+      <Handle type="source" position={Position.Bottom} style={{ opacity: 0, pointerEvents: "none" }} />
     <div
       data-node-kind={nodeKind}
       data-selected={selected ? "true" : "false"}
@@ -78,5 +81,6 @@ export function FlatNodeCompact({ data }: NodeProps<FlatStepNode>) {
         ) : null}
       </div>
     </div>
+    </>
   );
 }
