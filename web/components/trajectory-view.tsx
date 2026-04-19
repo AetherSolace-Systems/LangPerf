@@ -121,9 +121,7 @@ export function TrajectoryView({ trajectory }: { trajectory: TrajectoryDetail })
               </div>
             </div>
           </div>
-          <div className="w-[480px] flex-shrink-0 overflow-hidden">
-            <NodeDetailPanel trajectory={trajectory} />
-          </div>
+          <NodeDetailPanel trajectory={trajectory} />
         </div>
       </div>
       </FullscreenProvider>
