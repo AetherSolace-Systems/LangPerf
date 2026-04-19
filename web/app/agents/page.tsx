@@ -1,33 +1,14 @@
-import Link from "next/link";
 import { AppShell } from "@/components/shell/app-shell";
-import {
-  ContextSidebar,
-  CtxHeader,
-  CtxItem,
-} from "@/components/shell/context-sidebar";
+import { AgentsTable } from "@/components/agents/agents-table";
 import { Chip } from "@/components/ui/chip";
-import { listAgents, type AgentSummaryWithMetrics, type TimeWindow } from "@/lib/api";
-import { AgentGrid } from "@/components/dashboard/agent-grid";
-import { TimeRangePicker } from "@/components/agent/time-range-picker";
+import { listAgents, type AgentSummary } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
-function parseWindow(v: string | undefined): TimeWindow {
-  if (v === "24h" || v === "30d") return v;
-  return "7d";
-}
-
-export default async function AgentsIndex({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | undefined>>;
-}) {
-  const params = await searchParams;
-  const window = parseWindow(params.window);
-
-  let agents: AgentSummaryWithMetrics[];
+export default async function AgentsPage() {
+  let agents: AgentSummary[];
   try {
-    agents = (await listAgents({ with_metrics: true, window })) as AgentSummaryWithMetrics[];
+    agents = (await listAgents()) as AgentSummary[];
   } catch (err) {
     return (
       <AppShell
@@ -51,36 +32,18 @@ export default async function AgentsIndex({
     );
   }
 
-  const sidebar = (
-    <ContextSidebar>
-      <CtxHeader action="+ new">Agents</CtxHeader>
-      {agents.map((a) => (
-        <CtxItem key={a.id} sub={a.metrics.runs.toLocaleString()}>
-          <Link
-            href={`/agents/${encodeURIComponent(a.name)}`}
-            className="hover:underline"
-          >
-            {a.display_name ?? a.name}
-          </Link>
-        </CtxItem>
-      ))}
-    </ContextSidebar>
-  );
-
   return (
     <AppShell
       topBar={{
         breadcrumb: <span className="font-medium text-warm-fog">Agents</span>,
         right: (
-          <>
-            <TimeRangePicker current={window} />
-            <Chip>env: all</Chip>
-          </>
+          <Chip>
+            {agents.length} agent{agents.length === 1 ? "" : "s"}
+          </Chip>
         ),
       }}
-      contextSidebar={sidebar}
     >
-      <AgentGrid agents={agents} />
+      <AgentsTable agents={agents} />
     </AppShell>
   );
 }

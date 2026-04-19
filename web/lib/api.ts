@@ -7,6 +7,13 @@ export const SERVER_API_URL =
 export const CLIENT_API_URL =
   process.env.NEXT_PUBLIC_LANGPERF_API_URL ?? "http://localhost:4318";
 
+// Pick the right base URL by execution context, not by cookie presence.
+// Cookie-based selection breaks in single-user mode (no session cookie) — server
+// components then hit localhost:4318 from inside the container.
+export function apiBase(): string {
+  return typeof window === "undefined" ? SERVER_API_URL : CLIENT_API_URL;
+}
+
 export type TrajectorySummary = {
   id: string;
   trace_id: string | null;
@@ -77,8 +84,24 @@ function buildQuery(filters: ListFilters): string {
 }
 
 async function apiFetch<T>(path: string): Promise<T> {
-  const url = `${SERVER_API_URL}${path}`;
-  const resp = await fetch(url, { cache: "no-store" });
+  const base = apiBase();
+  const url = `${base}${path}`;
+  // On the server, forward the incoming session cookie so authenticated
+  // calls don't 401. `next/headers` is dynamic import because this module
+  // is also pulled into client bundles where the import doesn't resolve.
+  let cookie = "";
+  if (typeof window === "undefined") {
+    try {
+      const { headers } = await import("next/headers");
+      cookie = headers().get("cookie") ?? "";
+    } catch {
+      // Outside a request context (e.g. build-time); no cookie available.
+    }
+  }
+  const init: RequestInit = { cache: "no-store" };
+  if (cookie) init.headers = { cookie };
+  else if (typeof window !== "undefined") init.credentials = "include";
+  const resp = await fetch(url, init);
   if (!resp.ok) throw new Error(`langperf-api ${resp.status} at ${url}`);
   return resp.json();
 }
@@ -120,6 +143,8 @@ export type AgentSummary = {
   owner: string | null;
   github_url: string | null;
   language: string | null;
+  token_prefix: string | null;
+  last_token_used_at: string | null;
   created_at: string;
   updated_at: string;
 };
