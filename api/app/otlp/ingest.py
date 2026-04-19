@@ -26,7 +26,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Span, Trajectory
+from app.models import Agent, Span, Trajectory
 from app.otlp.agent_resolver import resolve_agent_and_version
 from app.otlp.attrs import (
     derive_kind,
@@ -46,17 +46,25 @@ logger = logging.getLogger("langperf.otlp.ingest")
 
 
 async def ingest_bundles(
-    session: AsyncSession, bundles: list[DecodedBundle], org_id: str
+    session: AsyncSession,
+    bundles: list[DecodedBundle],
+    *,
+    org_id: str,
+    agent: Agent,
 ) -> set[str]:
     """Upsert every span in every bundle; return the set of trajectory UUIDs touched.
 
-    Does NOT commit. Caller batches this with recompute_totals, then commits.
+    `agent` is the bearer-token-authorized agent — every trajectory
+    written here is bound to it. Does NOT commit. Caller batches this
+    with recompute_totals, then commits.
     """
     touched: set[str] = set()
     for bundle in bundles:
         resource_attrs = bundle["resource"]["attrs"]
         for span in bundle["spans"]:
-            traj_id = await _upsert_span(session, span, resource_attrs, org_id=org_id)
+            traj_id = await _upsert_span(
+                session, span, resource_attrs, org_id=org_id, agent=agent
+            )
             touched.add(traj_id)
     logger.debug("ingested %d bundles; touched %d trajectories", len(bundles), len(touched))
     return touched
@@ -75,7 +83,12 @@ async def recompute_totals(
 
 
 async def _upsert_span(
-    session: AsyncSession, span: DecodedSpan, resource_attrs: dict[str, Any], *, org_id: str
+    session: AsyncSession,
+    span: DecodedSpan,
+    resource_attrs: dict[str, Any],
+    *,
+    org_id: str,
+    agent: Agent,
 ) -> str:
     traj_id = resolve_trajectory_id(span)
     started_at = _unix_nano_to_dt(span["start_time_unix_nano"])
@@ -99,6 +112,7 @@ async def _upsert_span(
         span_started_at=started_at,
         span_ended_at=ended_at,
         org_id=org_id,
+        agent=agent,
     )
 
     span_row = {
@@ -134,13 +148,13 @@ async def _upsert_trajectory_for_span(
     span_started_at: datetime,
     span_ended_at: datetime | None,
     org_id: str,
+    agent: Agent,
 ) -> None:
     service_name = resolve_service_name(resource_attrs)
     environment = resolve_environment(resource_attrs)
     name = resolve_trajectory_name(span, resource_attrs)
-    # TODO(v2b): scope OTLP ingestion per API key once we add api_keys table
     agent_id, agent_version_id = await resolve_agent_and_version(
-        session, resource_attrs, org_id=org_id
+        session, resource_attrs, agent=agent
     )
 
     values: dict[str, Any] = {

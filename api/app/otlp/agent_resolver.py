@@ -1,12 +1,15 @@
-"""Given OTel resource attributes, return (agent_id, agent_version_id).
+"""Given OTel resource attributes + a pre-authorized agent, return
+(agent_id, agent_version_id) for the trajectory write.
 
-Upserts rows in agents + agent_versions as needed. Reuses `agents.signature`
-as the dedup key, and `(agent_id, git_sha, package_version)` as the version
-dedup key. All writes stay in the caller's session; caller commits.
+The agent is now determined by the bearer token on the ingest request —
+`resolve_agent_and_version` no longer auto-creates agents from
+`service.name`/signature. Versions, however, are still resource-attr
+driven: each unique `(agent_id, git_sha, package_version)` tuple gets
+its own `AgentVersion` row.
 
-Also updates `agents.language`, `agents.github_url`, and
-`agent_versions.last_seen_at` on every ingest so they stay current without
-a separate heartbeat.
+Also refreshes `agents.language` / `agents.github_url` if they were not
+previously populated — the SDK may discover these post-registration and
+it's cheap to keep them current.
 """
 
 from __future__ import annotations
@@ -18,11 +21,9 @@ from typing import Any, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agent_naming import generate_name
 from app.constants import (
     ATTR_AGENT_GIT_ORIGIN,
     ATTR_AGENT_LANGUAGE,
-    ATTR_AGENT_SIGNATURE,
     ATTR_AGENT_VERSION_PACKAGE,
     ATTR_AGENT_VERSION_SHA,
     ATTR_AGENT_VERSION_SHORT_SHA,
@@ -53,31 +54,33 @@ def _version_label(package_version: Optional[str], short_sha: Optional[str]) -> 
 
 
 async def resolve_agent_and_version(
-    session: AsyncSession, resource_attrs: dict[str, Any], *, org_id: str
-) -> tuple[Optional[str], Optional[str]]:
+    session: AsyncSession,
+    resource_attrs: dict[str, Any],
+    *,
+    agent: Agent,
+) -> tuple[str, Optional[str]]:
     """Return (agent_id, agent_version_id) for the resource attrs.
 
-    If no signature is present (e.g. legacy SDK), returns (None, None) —
-    caller is expected to leave trajectory FKs null, and the backfill step
-    will attribute them later.
+    The agent is authoritative — it was authorized via bearer token in
+    the receiver. The only thing we look up from the resource attrs here
+    is the `AgentVersion` row (keyed on `git_sha` + `package_version`).
+
+    If no version-identifying attributes are present, returns
+    (agent.id, None); the caller leaves `agent_version_id` null on the
+    trajectory.
     """
-    signature = resource_attrs.get(ATTR_AGENT_SIGNATURE)
-    if not signature:
-        return None, None
+    language = resource_attrs.get(ATTR_AGENT_LANGUAGE)
+    git_origin = resource_attrs.get(ATTR_AGENT_GIT_ORIGIN)
+    _refresh_agent_metadata(session, agent, language=language, git_origin=git_origin)
 
     git_sha = resource_attrs.get(ATTR_AGENT_VERSION_SHA)
     short_sha = resource_attrs.get(ATTR_AGENT_VERSION_SHORT_SHA)
     package_version = resource_attrs.get(ATTR_AGENT_VERSION_PACKAGE)
-    language = resource_attrs.get(ATTR_AGENT_LANGUAGE)
-    git_origin = resource_attrs.get(ATTR_AGENT_GIT_ORIGIN)
 
-    agent = await _upsert_agent(
-        session,
-        signature=signature,
-        language=language,
-        git_origin=git_origin,
-        org_id=org_id,
-    )
+    if not any((git_sha, short_sha, package_version)):
+        # No version attributes — skip version tracking for this trace.
+        return agent.id, None
+
     version = await _upsert_version(
         session,
         agent_id=agent.id,
@@ -88,50 +91,23 @@ async def resolve_agent_and_version(
     return agent.id, version.id
 
 
-async def _upsert_agent(
+def _refresh_agent_metadata(
     session: AsyncSession,
+    agent: Agent,
     *,
-    signature: str,
     language: Optional[str],
     git_origin: Optional[str],
-    org_id: str,
-) -> Agent:
-    existing = (
-        await session.execute(select(Agent).where(Agent.signature == signature))
-    ).scalar_one_or_none()
-    if existing:
-        changed = False
-        if language and not existing.language:
-            existing.language = language
-            changed = True
-        inferred_github = _derive_github_url(git_origin)
-        if inferred_github and not existing.github_url:
-            existing.github_url = inferred_github
-            changed = True
-        if changed:
-            session.add(existing)
-        return existing
-
-    name = await _pick_unused_name(session)
-    new = Agent(
-        id=str(uuid.uuid4()),
-        org_id=org_id,
-        signature=signature,
-        name=name,
-        language=language,
-        github_url=_derive_github_url(git_origin),
-    )
-    session.add(new)
-    await session.flush()
-    logger.info("agent_signature_new sig=%s generated_name=%s", signature, name)
-    return new
-
-
-async def _pick_unused_name(session: AsyncSession) -> str:
-    taken = set(
-        (await session.execute(select(Agent.name))).scalars().all()
-    )
-    return generate_name(lambda candidate: candidate in taken)
+) -> None:
+    changed = False
+    if language and not agent.language:
+        agent.language = language
+        changed = True
+    inferred_github = _derive_github_url(git_origin)
+    if inferred_github and not agent.github_url:
+        agent.github_url = inferred_github
+        changed = True
+    if changed:
+        session.add(agent)
 
 
 async def _upsert_version(
