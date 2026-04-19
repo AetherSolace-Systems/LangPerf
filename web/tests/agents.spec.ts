@@ -10,58 +10,53 @@ test.describe("Agents index /agents", () => {
     await expect(page.getByText("Agents", { exact: true }).first()).toBeVisible();
   });
 
-  test("'env: all' chip is visible", async ({ page }) => {
-    await expect(page.getByText("env: all")).toBeVisible();
+  test("agent count chip is visible", async ({ page }) => {
+    // Top bar now shows "<N> agent(s)" instead of "env: all".
+    await expect(page.getByText(/\d+ agents?/).first()).toBeVisible();
   });
 
-  test("time-range picker has 24h, 7d, 30d buttons", async ({ page }) => {
-    for (const w of ["24h", "7d", "30d"]) {
-      await expect(page.getByRole("button", { name: w })).toBeVisible();
+  test("filter input + add-agent button are visible", async ({ page }) => {
+    // Time-range picker was removed from /agents in the refactor; the page
+    // now exposes a filter input + "+ Add agent" button.
+    await expect(page.getByPlaceholder("Filter agents...")).toBeVisible();
+    await expect(page.getByRole("button", { name: /\+ Add agent/i })).toBeVisible();
+  });
+
+  test("agent table is visible with at least one row", async ({ page }) => {
+    // /agents now renders AgentsTable (not AgentGrid). Rows link to agent pages.
+    const table = page.locator("table");
+    await expect(table).toBeVisible();
+    const rows = table.locator("tbody tr");
+    const count = await rows.count();
+    expect(count).toBeGreaterThan(0);
+    // At least one row has a link into /agents/<name>/overview
+    await expect(table.locator("a[href^='/agents/']").first()).toBeVisible();
+  });
+
+  test("each row shows agent name, language, and created date", async ({ page }) => {
+    const table = page.locator("table");
+    const firstRow = table.locator("tbody tr").first();
+    await expect(firstRow).toBeVisible();
+
+    // Name link in first cell
+    const nameLink = firstRow.locator("a[href^='/agents/']").first();
+    await expect(nameLink).toBeVisible();
+    const nameText = await nameLink.textContent();
+    expect(nameText?.trim().length).toBeGreaterThan(0);
+
+    // Expected columns in header row (active column has a sort arrow suffix
+    // like " ▲", so match the label as a substring).
+    const thead = table.locator("thead tr");
+    for (const col of ["Name", "Project", "Lang", "Token", "Last used", "Created"]) {
+      await expect(thead.locator("th").filter({ hasText: col })).toHaveCount(1);
     }
   });
 
-  test("agent card grid is visible with at least one card", async ({ page }) => {
-    // AgentGrid renders a grid-cols-4 div with agent link cards
-    const grid = page.locator(".grid.grid-cols-4").first();
-    await expect(grid).toBeVisible();
-    const cards = grid.locator("a[href^='/agents/']");
-    const count = await cards.count();
-    expect(count).toBeGreaterThan(0);
-  });
-
-  test("each card shows agent name, metadata, and a sparkline SVG", async ({ page }) => {
-    const grid = page.locator(".grid.grid-cols-4").first();
-    const firstCard = grid.locator("a[href^='/agents/']").first();
-    await expect(firstCard).toBeVisible();
-
-    // Status dot — inline span with inline background style (width: 6px)
-    const dot = firstCard.locator("span[style*='width']").first();
-    await expect(dot).toBeVisible();
-
-    // Agent name text (in the truncate span)
-    const nameSpan = firstCard.locator(".truncate");
-    await expect(nameSpan).toBeVisible();
-    const nameText = await nameSpan.textContent();
-    expect(nameText?.trim().length).toBeGreaterThan(0);
-
-    // Metadata div: "X · Y% err · p95 Z" — uses font-mono text-patina mt-[2px]
-    // It's a div (block), whereas the version label is a span inside the name row
-    const metaDivs = firstCard.locator("div.font-mono.text-patina");
-    // There should be exactly one metadata div (the runs/err/p95 line)
-    const metaText = await metaDivs.first().textContent();
-    // Metadata contains "err" and "p95"
-    expect(metaText).toMatch(/err/);
-    expect(metaText).toMatch(/p95/);
-
-    // Sparkline SVG (aria-hidden)
-    const svg = firstCard.locator("svg[aria-hidden='true']");
-    await expect(svg).toBeVisible();
-  });
-
-  test("clicking a card navigates to /agents/<name>/overview", async ({ page }) => {
-    const grid = page.locator(".grid.grid-cols-4").first();
-    const firstCard = grid.locator("a[href^='/agents/']").first();
-    await firstCard.click();
+  test("clicking a row link navigates to /agents/<name>/overview", async ({ page }) => {
+    const firstLink = page
+      .locator("table tbody tr a[href^='/agents/']")
+      .first();
+    await firstLink.click();
     await expect(page).toHaveURL(/\/agents\/.+\/overview$/);
   });
 

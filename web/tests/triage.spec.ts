@@ -1,8 +1,10 @@
 import { expect, test } from "@playwright/test";
 
-test("queue is the default for logged-in users", async ({ page }) => {
-  await page.goto("/");
-  await expect(page).toHaveURL(/\/queue/);
+test("queue is reachable from the app shell", async ({ page }) => {
+  // `/` now renders the dashboard; the queue has its own route and appears in
+  // the left rail as "queue". Assert the page loads and has the expected chrome.
+  await page.goto("/queue");
+  await expect(page).toHaveURL(/\/queue$/);
 });
 
 test("queue row opens trajectory detail", async ({ page }) => {

@@ -11,18 +11,17 @@ test.describe("App shell", () => {
 
   test("rail shows primary nav items, with v2 items disabled", async ({ page }) => {
     await page.goto("/");
-    const nav = page.locator("nav.w-\\[56px\\]");
+    const nav = page.getByTestId("rail-nav");
 
-    // Primary items (all clickable). Each link text is glyph+label (e.g. "□home"),
+    // Primary items (all clickable). Each link text is glyph+label (e.g. "□dash"),
     // so match the label substring rather than anchoring with ^…$.
-    for (const label of ["home", "agents", "history", "logs", "config"]) {
+    for (const label of ["dash", "agents", "history", "logs", "config"]) {
       const item = nav.locator("a").filter({ hasText: new RegExp(label, "i") });
       await expect(item).toBeVisible();
     }
 
     // v2 items render as <div> not <a>, with aria-disabled + title.
-    // Text is glyph+label (e.g. "!triage"), so match label substring.
-    for (const label of ["triage", "evals", "data"]) {
+    for (const label of ["evals", "data"]) {
       const item = nav.locator("div[aria-disabled='true']").filter({
         hasText: new RegExp(label, "i"),
       });
@@ -33,8 +32,8 @@ test.describe("App shell", () => {
 
   test("home rail item is active on `/`", async ({ page }) => {
     await page.goto("/");
-    // Link text is glyph+label ("□home"), match label substring.
-    const home = page.locator("nav.w-\\[56px\\] a").filter({ hasText: /home/i });
+    // Link text is glyph+label ("□dash"), match label substring.
+    const home = page.getByTestId("rail-nav").locator("a").filter({ hasText: /dash/i });
     await expect(home).toHaveClass(/text-aether-teal/);
   });
 });
