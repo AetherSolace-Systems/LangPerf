@@ -37,7 +37,7 @@ jobs:
         working-directory: api
 
   web-lint:
-    name: eslint + tsc (web)
+    name: eslint + tsc + vitest (web)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -51,4 +51,6 @@ jobs:
       - run: npm run lint
         working-directory: web
       - run: npm run typecheck
+        working-directory: web
+      - run: npm run test:unit
         working-directory: web
