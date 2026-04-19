@@ -55,6 +55,8 @@ function TreeRow({ node }: { node: TreeNode }) {
               e.stopPropagation();
               setOpen(!open);
             }}
+            aria-label={open ? "Collapse children" : "Expand children"}
+            aria-expanded={open}
             className="w-4 h-4 flex items-center justify-center text-patina hover:text-warm-fog -ml-1 mr-1"
           >
             {open ? "▼" : "▶"}

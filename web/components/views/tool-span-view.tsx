@@ -46,7 +46,7 @@ export function ToolSpanView({ span }: { span: Span }) {
       ) : null}
 
       <details className="border border-[var(--border)] rounded-md">
-        <summary className="cursor-pointer px-3 py-2 text-xs uppercase tracking-wider text-[var(--muted)] select-none">
+        <summary className="cursor-pointer px-3 py-2 text-xs uppercase tracking-wider text-[var(--muted)] select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-aether-teal focus-visible:outline-offset-2 rounded-sm">
           All attributes
         </summary>
         <div className="px-3 pb-3 bg-black/20">

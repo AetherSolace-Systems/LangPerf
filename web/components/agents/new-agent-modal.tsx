@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createAgent } from "@/lib/agents";
 import { TokenDisplay } from "./token-display";
 import type { Project } from "@/lib/projects";
 import { ProjectSelect } from "@/components/projects/project-select";
+
+const FOCUSABLE_SELECTOR =
+  '[tabindex]:not([tabindex="-1"]), input:not([disabled]), button:not([disabled]), [href], select:not([disabled]), textarea:not([disabled])';
 
 export function NewAgentModal({
   onClose,
@@ -25,6 +28,41 @@ export function NewAgentModal({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [issuedToken, setIssuedToken] = useState<string | null>(null);
+  const modalRef = useRef<HTMLDivElement | null>(null);
+
+  // On mount: move focus to the first focusable descendant.
+  useEffect(() => {
+    const root = modalRef.current;
+    if (!root) return;
+    const focusables = root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+    if (focusables.length > 0) focusables[0].focus();
+  }, [issuedToken]);
+
+  // Tab-cycle trap + Escape to close.
+  function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      onClose();
+      return;
+    }
+    if (e.key !== "Tab") return;
+    const root = modalRef.current;
+    if (!root) return;
+    const focusables = Array.from(
+      root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+    ).filter((el) => !el.hasAttribute("disabled"));
+    if (focusables.length === 0) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    const active = document.activeElement as HTMLElement | null;
+    if (e.shiftKey && active === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && active === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -53,10 +91,18 @@ export function NewAgentModal({
       onClick={onClose}
     >
       <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-agent-modal-title"
+        onKeyDown={onKeyDown}
         className="w-full max-w-md rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-4 text-lg font-semibold text-aether-teal">
+        <h2
+          id="new-agent-modal-title"
+          className="mb-4 text-lg font-semibold text-aether-teal"
+        >
           {issuedToken ? "Agent created" : "Register new agent"}
         </h2>
         {issuedToken ? (

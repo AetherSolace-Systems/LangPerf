@@ -161,7 +161,7 @@ function Collapsible({
 }) {
   return (
     <details className="border border-[color:var(--border)] rounded-md">
-      <summary className="cursor-pointer px-3 py-2 text-xs uppercase tracking-wider text-patina select-none">
+      <summary className="cursor-pointer px-3 py-2 text-xs uppercase tracking-wider text-patina select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-aether-teal focus-visible:outline-offset-2 rounded-sm">
         {title}
       </summary>
       <div className="px-3 pb-3 bg-carbon/50">{children}</div>
