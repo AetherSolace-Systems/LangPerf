@@ -7,6 +7,7 @@ import { fmtDuration } from "@/lib/format";
 import { ClientTime } from "@/components/client-time";
 import { NodeDetailPanel } from "@/components/node-detail-panel";
 import { NotesEditor } from "@/components/notes-editor";
+import { FullscreenProvider } from "@/components/graph/fullscreen-context";
 import { SelectionProvider } from "@/components/selection-context";
 import { TagSelector } from "@/components/tag-selector";
 import { TrajectoryGraph } from "@/components/trajectory-graph";
@@ -22,6 +23,7 @@ export function TrajectoryView({ trajectory }: { trajectory: TrajectoryDetail })
 
   return (
     <SelectionProvider spans={trajectory.spans} initialId={firstSpanId}>
+      <FullscreenProvider>
       <div className="h-screen flex flex-col">
         <header className="border-b border-[color:var(--border)] px-6 py-3 flex-shrink-0">
           <Link href="/" className="text-xs text-twilight hover:text-linen">
@@ -120,10 +122,11 @@ export function TrajectoryView({ trajectory }: { trajectory: TrajectoryDetail })
             </div>
           </div>
           <div className="w-[480px] flex-shrink-0 overflow-hidden">
-            <NodeDetailPanel />
+            <NodeDetailPanel trajectory={trajectory} />
           </div>
         </div>
       </div>
+      </FullscreenProvider>
     </SelectionProvider>
   );
 }

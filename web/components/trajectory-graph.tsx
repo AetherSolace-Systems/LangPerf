@@ -14,6 +14,7 @@ import {
 
 import type { Span } from "@/lib/api";
 import { DRIFT, KIND_GLYPH, KIND_LABEL, kindSwatch } from "@/lib/colors";
+import { GraphToolbar } from "@/components/graph/graph-toolbar";
 import { useSelection } from "@/components/selection-context";
 import { fmtDuration, fmtTokens } from "@/lib/format";
 import { buildSequenceLayout, type LayoutNode } from "@/lib/sequence-layout";
@@ -192,7 +193,8 @@ export function TrajectoryGraph({ spans }: { spans: Span[] }) {
   }
 
   return (
-    <div className="w-full h-full bg-midnight">
+    <div className="w-full h-full bg-midnight relative">
+      <GraphToolbar />
       <ReactFlow
         nodes={rfNodes}
         edges={[]}
