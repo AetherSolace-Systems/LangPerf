@@ -14,11 +14,12 @@ export type FlatStepExpandedData = {
   selected: boolean;
   commentCount: number;
   onToggle: () => void;
+  onSelect: () => void;
 };
 type ExpandedNode = Node<FlatStepExpandedData, "stepExpanded">;
 
 export function FlatNodeExpanded({ data }: NodeProps<ExpandedNode>) {
-  const { layout, selected, commentCount, onToggle } = data;
+  const { layout, selected, commentCount, onToggle, onSelect } = data;
   const { span, nodeKind } = layout;
   if (!span) return null;
   const swatch = kindSwatch(nodeKind);
@@ -32,7 +33,7 @@ export function FlatNodeExpanded({ data }: NodeProps<ExpandedNode>) {
       data-selected={selected ? "true" : "false"}
       onClick={(e) => {
         e.stopPropagation();
-        onToggle();
+        onSelect();
       }}
       className="relative cursor-pointer flex flex-col"
       style={{
@@ -68,6 +69,18 @@ export function FlatNodeExpanded({ data }: NodeProps<ExpandedNode>) {
           {tokens != null ? <span>{fmtTokens(tokens)}t</span> : null}
           <span>{fmtDuration(span.duration_ms ?? null)}</span>
         </span>
+        <button
+          type="button"
+          title="Collapse body"
+          aria-label="Collapse"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle();
+          }}
+          className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-[10px] text-warm-fog/50 hover:text-aether-teal rounded hover:bg-warm-fog/5"
+        >
+          ▾
+        </button>
         {isError ? <span className="text-warn text-sm ml-1">!</span> : null}
         {commentCount > 0 ? (
           <span className="min-w-[16px] h-[16px] px-1 rounded-full bg-peach-neon text-carbon text-[9px] font-bold flex items-center justify-center">

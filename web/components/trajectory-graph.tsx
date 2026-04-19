@@ -164,6 +164,7 @@ export function TrajectoryGraph({
               selected: ln.span?.span_id === selectedId,
               commentCount: ln.span ? commentCounts?.get(ln.span.span_id) ?? 0 : 0,
               onToggle: () => ln.span && toggleExpand(ln.span.span_id),
+              onSelect: () => ln.span && select(ln.span),
             } satisfies FlatStepData | FlatStepExpandedData)
           : ({
               layout: ln,

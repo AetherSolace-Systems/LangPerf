@@ -11,11 +11,12 @@ export type FlatStepData = {
   selected: boolean;
   commentCount: number;
   onToggle: () => void;
+  onSelect: () => void;
 };
 type FlatStepNode = Node<FlatStepData, "step">;
 
 export function FlatNodeCompact({ data }: NodeProps<FlatStepNode>) {
-  const { layout, selected, commentCount, onToggle } = data;
+  const { layout, selected, commentCount, onToggle, onSelect } = data;
   const { span, nodeKind, execOrder } = layout;
   const swatch = kindSwatch(nodeKind);
   const tokens = extractTotalTokens(span);
@@ -32,7 +33,7 @@ export function FlatNodeCompact({ data }: NodeProps<FlatStepNode>) {
       data-selected={selected ? "true" : "false"}
       onClick={(e) => {
         e.stopPropagation();
-        onToggle();
+        onSelect();
       }}
       className="relative cursor-pointer transition-colors"
       style={{
@@ -70,6 +71,19 @@ export function FlatNodeCompact({ data }: NodeProps<FlatStepNode>) {
           {tokens != null ? <div>{fmtTokens(tokens)}t</div> : null}
           <div>{fmtDuration(span?.duration_ms ?? null)}</div>
         </div>
+        <button
+          type="button"
+          title="Expand body"
+          aria-label="Expand"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect();
+            onToggle();
+          }}
+          className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-[10px] text-warm-fog/50 hover:text-aether-teal rounded hover:bg-warm-fog/5"
+        >
+          ▸
+        </button>
         {isError ? (
           <span className="absolute -top-1 -right-1 text-warn text-sm">!</span>
         ) : null}

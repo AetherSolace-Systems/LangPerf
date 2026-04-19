@@ -1,18 +1,21 @@
 import { test, expect } from "@playwright/test";
 import { firstRunIdWithMinSteps } from "./_helpers";
 
-test("clicking a node reveals inline body", async ({ page }) => {
+test("clicking the expand caret reveals inline body", async ({ page }) => {
   const tid = await firstRunIdWithMinSteps(page, 3);
   await page.goto(`/t/${tid}`);
   await page.getByRole("button", { name: /^graph$/i }).click();
 
   const node = page.locator('[data-node-kind]').first();
   await expect(node).toBeVisible();
-
-  // Body not visible by default
   await expect(node.locator('[data-expanded-body]')).toHaveCount(0);
 
+  // Click the body → selects (no expand).
   await node.click();
+  await expect(node.locator('[data-expanded-body]')).toHaveCount(0);
+
+  // Click the caret (aria-label="Expand") → expands.
+  await node.getByRole("button", { name: /expand/i }).click();
   await expect(node.locator('[data-expanded-body]')).toBeVisible();
 });
 
