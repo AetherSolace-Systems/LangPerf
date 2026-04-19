@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import type { TrajectoryDetail } from "@/lib/api";
 import { fmtDuration } from "@/lib/format";
@@ -33,7 +34,10 @@ function TrajectoryLayout({ trajectory }: { trajectory: TrajectoryDetail }) {
   const [notesOpen, setNotesOpen] = useState<boolean>(!!trajectory.notes);
   const [lowerView, setLowerView] = useState<LowerView>("timeline");
   const commentCounts = useCommentCounts(trajectory);
-  const { fsOpen, toggleFs, toggleExpandAll, collapseAll } = useFullscreen();
+  const { fsOpen, toggleFs, toggleExpandAll, collapseAll, setFs } = useFullscreen();
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -62,6 +66,27 @@ function TrajectoryLayout({ trajectory }: { trajectory: TrajectoryDetail }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [fsOpen, toggleFs, toggleExpandAll, collapseAll]);
+
+  // On mount, sync fsOpen FROM URL
+  useEffect(() => {
+    const want = params.get("fs") === "1";
+    if (want !== fsOpen) setFs(want);
+    // intentionally only on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // When fsOpen changes, push URL
+  useEffect(() => {
+    const want = fsOpen ? "1" : null;
+    const current = params.get("fs");
+    if (current !== want) {
+      const sp = new URLSearchParams(params.toString());
+      if (want) sp.set("fs", want);
+      else sp.delete("fs");
+      const q = sp.toString();
+      router.replace(q ? `${pathname}?${q}` : pathname);
+    }
+  }, [fsOpen, params, router, pathname]);
 
   if (fsOpen) {
     return (
