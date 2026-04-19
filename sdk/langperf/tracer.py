@@ -26,6 +26,7 @@ def init(
     endpoint: Optional[str] = None,
     service_name: Optional[str] = None,
     environment: Optional[str] = None,
+    api_token: Optional[str] = None,
 ) -> TracerProvider:
     """Configure LangPerf.
 
@@ -45,6 +46,8 @@ def init(
         LANGPERF_ENDPOINT       default: http://localhost:4318
         LANGPERF_SERVICE_NAME   default: "langperf-agent"
         LANGPERF_ENVIRONMENT    default: (unset)
+        LANGPERF_API_TOKEN      required — per-agent bearer token minted in
+                                the UI when you register the agent.
     """
     if _state["initialized"]:
         logger.debug("langperf.init() called more than once; ignoring subsequent call")
@@ -53,6 +56,12 @@ def init(
     endpoint = endpoint or os.environ.get("LANGPERF_ENDPOINT", "http://localhost:4318")
     service_name = service_name or os.environ.get("LANGPERF_SERVICE_NAME", "langperf-agent")
     environment = environment or os.environ.get("LANGPERF_ENVIRONMENT")
+    token = api_token or os.environ.get("LANGPERF_API_TOKEN")
+    if not token:
+        raise RuntimeError(
+            "LANGPERF_API_TOKEN is required. Register an agent in the UI and "
+            "set the token via LANGPERF_API_TOKEN or the api_token kwarg."
+        )
 
     # detect() reads the call stack. `_caller_info()` indexes inspect.stack()
     # whose [0] frame is _caller_info itself, [1] is detect, [2] is init (here),
@@ -80,7 +89,10 @@ def init(
 
     provider = TracerProvider(resource=resource)
     provider.add_span_processor(LangPerfBaggageSpanProcessor())
-    exporter = OTLPSpanExporter(endpoint=endpoint.rstrip("/") + "/v1/traces")
+    exporter = OTLPSpanExporter(
+        endpoint=endpoint.rstrip("/") + "/v1/traces",
+        headers={"Authorization": f"Bearer {token}"},
+    )
     provider.add_span_processor(BatchSpanProcessor(exporter))
     trace_api.set_tracer_provider(provider)
 
