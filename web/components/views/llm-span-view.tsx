@@ -18,12 +18,12 @@ function MessageCard({ message }: { message: LlmMessage }) {
       >
         {message.role}
       </div>
-      <div className="p-3 text-sm whitespace-pre-wrap break-words text-linen/90">
+      <div className="p-3 text-sm whitespace-pre-wrap break-words text-warm-fog/90">
         {message.content ??
           (message.tool_calls?.length ? (
-            <span className="text-twilight italic">(tool calls only)</span>
+            <span className="text-patina italic">(tool calls only)</span>
           ) : (
-            <span className="text-twilight italic">(no content)</span>
+            <span className="text-patina italic">(no content)</span>
           ))}
       </div>
       {message.tool_calls?.length ? (
@@ -31,16 +31,16 @@ function MessageCard({ message }: { message: LlmMessage }) {
           {message.tool_calls.map((tc, idx) => (
             <div
               key={idx}
-              className="text-xs font-mono bg-midnight/60 rounded border p-2"
+              className="text-xs font-mono bg-carbon/60 rounded border p-2"
               style={{ borderColor: swatch.border }}
             >
               <div style={{ color: swatch.fg }}>
-                <span className="text-twilight">→</span> {tc.name}
+                <span className="text-patina">→</span> {tc.name}
                 {tc.id ? (
-                  <span className="text-twilight ml-2">({tc.id})</span>
+                  <span className="text-patina ml-2">({tc.id})</span>
                 ) : null}
               </div>
-              <pre className="mt-1 text-twilight overflow-x-auto">
+              <pre className="mt-1 text-patina overflow-x-auto">
                 {typeof tc.arguments === "string"
                   ? tc.arguments
                   : JSON.stringify(tc.arguments, null, 2)}
@@ -59,14 +59,14 @@ export function LlmSpanView({ span }: { span: Span }) {
   return (
     <div className="space-y-5">
       <section>
-        <h3 className="text-[10px] uppercase tracking-wider text-twilight mb-2">
+        <h3 className="text-[10px] uppercase tracking-wider text-patina mb-2">
           Model
         </h3>
         <div className="font-mono text-sm">
           {f.system ? (
-            <span className="text-twilight">{f.system} · </span>
+            <span className="text-patina">{f.system} · </span>
           ) : null}
-          {f.model ?? <span className="text-twilight">unknown</span>}
+          {f.model ?? <span className="text-patina">unknown</span>}
         </div>
       </section>
 
@@ -81,7 +81,7 @@ export function LlmSpanView({ span }: { span: Span }) {
 
       {f.input_messages.length > 0 ? (
         <section>
-          <h3 className="text-[10px] uppercase tracking-wider text-twilight mb-2">
+          <h3 className="text-[10px] uppercase tracking-wider text-patina mb-2">
             Input messages
           </h3>
           <div className="space-y-2">
@@ -94,7 +94,7 @@ export function LlmSpanView({ span }: { span: Span }) {
 
       {f.output_messages.length > 0 ? (
         <section>
-          <h3 className="text-[10px] uppercase tracking-wider text-twilight mb-2">
+          <h3 className="text-[10px] uppercase tracking-wider text-patina mb-2">
             Output
           </h3>
           <div className="space-y-2">
@@ -141,7 +141,7 @@ function Stat({
 }) {
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wider text-twilight">
+      <div className="text-[10px] uppercase tracking-wider text-patina">
         {label}
       </div>
       <div className="font-mono text-sm tabular-nums mt-0.5">
@@ -161,10 +161,10 @@ function Collapsible({
 }) {
   return (
     <details className="border border-[color:var(--border)] rounded-md">
-      <summary className="cursor-pointer px-3 py-2 text-xs uppercase tracking-wider text-twilight select-none">
+      <summary className="cursor-pointer px-3 py-2 text-xs uppercase tracking-wider text-patina select-none">
         {title}
       </summary>
-      <div className="px-3 pb-3 bg-midnight/50">{children}</div>
+      <div className="px-3 pb-3 bg-carbon/50">{children}</div>
     </details>
   );
 }

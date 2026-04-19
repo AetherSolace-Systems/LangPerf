@@ -99,6 +99,8 @@ Four public symbols.
 | `LANGPERF_SERVICE_NAME`     | *(deprecated; use `LANGPERF_AGENT_NAME`)*             |
 | `LANGPERF_ENVIRONMENT`      | Maps to OTel `deployment.environment`                 |
 
+See [`.env.example`](./.env.example) for the full list of supported environment variables (API, web, Postgres, SDK, and test harness).
+
 ## UI features (v1)
 
 - Split left pane: collapsible **tree** on top, auto-laid-out **graph** (React Flow + dagre) below, with selection synced between them and the right panel

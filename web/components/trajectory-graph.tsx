@@ -94,11 +94,11 @@ export function TrajectoryGraph({
   }, [spans, selectedId, toggleExpand, expandAll, expandedIds, commentCounts]);
 
   if (rfNodes.length === 0) {
-    return <div className="p-6 text-sm text-twilight">No spans to graph.</div>;
+    return <div className="p-6 text-sm text-patina">No spans to graph.</div>;
   }
 
   return (
-    <div className="w-full h-full bg-midnight relative">
+    <div className="w-full h-full bg-carbon relative">
       <GraphToolbar />
       <ReactFlow
         nodes={rfNodes}
@@ -128,7 +128,7 @@ export function TrajectoryGraph({
         />
         <Controls
           showInteractive={false}
-          className="!bg-deep-indigo !border !border-[color:var(--border)] !shadow-none [&_button]:!bg-deep-indigo [&_button]:!border-[color:var(--border)] [&_button]:!text-linen [&_button]:!fill-linen [&_button:hover]:!bg-aether-teal/20"
+          className="!bg-steel-mist !border !border-[color:var(--border)] !shadow-none [&_button]:!bg-steel-mist [&_button]:!border-[color:var(--border)] [&_button]:!text-warm-fog [&_button]:!fill-warm-fog [&_button:hover]:!bg-aether-teal/20"
         />
       </ReactFlow>
       {fsOpen ? (

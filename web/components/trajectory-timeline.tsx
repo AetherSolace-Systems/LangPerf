@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 import type { Span } from "@/lib/api";
-import { DRIFT, kindSwatch } from "@/lib/colors";
+import { AETHER, kindSwatch } from "@/lib/colors";
 import { useSelection } from "@/components/selection-context";
 import { fmtDuration } from "@/lib/format";
 import { kindOf } from "@/lib/span-fields";
@@ -127,7 +127,7 @@ export function TrajectoryTimeline({ spans }: { spans: Span[] }) {
   );
 
   if (spans.length === 0) {
-    return <div className="p-6 text-sm text-twilight">No spans to plot.</div>;
+    return <div className="p-6 text-sm text-patina">No spans to plot.</div>;
   }
 
   const zoomIn = () =>
@@ -154,8 +154,8 @@ export function TrajectoryTimeline({ spans }: { spans: Span[] }) {
         onFit={fit}
         pxPerMs={effectivePxPerMs}
       />
-      <div className="absolute top-2 left-4 z-30 text-[10px] font-mono text-twilight pointer-events-none">
-        <span className="text-linen/80">
+      <div className="absolute top-2 left-4 z-30 text-[10px] font-mono text-patina pointer-events-none">
+        <span className="text-warm-fog/80">
           {mounted ? fmtDate(trajectoryStartMs) : ""}
         </span>
         <span className="ml-2">
@@ -175,11 +175,11 @@ export function TrajectoryTimeline({ spans }: { spans: Span[] }) {
       >
         {/* Axis row — sticky to top so it stays visible while scrolling rows. */}
         <div
-          className="flex sticky top-0 z-20 bg-midnight border-b border-[color:var(--border)]"
+          className="flex sticky top-0 z-20 bg-carbon border-b border-[color:var(--border)]"
           style={{ minWidth: LABEL_WIDTH + trackWidth }}
         >
           <div
-            className="flex-shrink-0 sticky left-0 z-10 bg-midnight"
+            className="flex-shrink-0 sticky left-0 z-10 bg-carbon"
             style={{ width: LABEL_WIDTH, height: 32 }}
           />
           <div
@@ -202,7 +202,7 @@ export function TrajectoryTimeline({ spans }: { spans: Span[] }) {
                   style={{ left: leftPx, transform: anchor }}
                 >
                   <div className="w-px h-2 bg-[color:var(--border-strong)]" />
-                  <span className="text-[10px] text-twilight tabular-nums mt-0.5 px-1 whitespace-nowrap">
+                  <span className="text-[10px] text-patina tabular-nums mt-0.5 px-1 whitespace-nowrap">
                     {mounted ? fmtTickTime(absMs, tickIntervalMs) : ""}
                   </span>
                 </div>
@@ -241,11 +241,11 @@ function ZoomControls({
   pxPerMs: number;
 }) {
   return (
-    <div className="absolute top-1.5 right-3 z-30 flex items-center gap-1 bg-deep-indigo/80 backdrop-blur border border-[color:var(--border)] rounded px-1.5 py-0.5">
+    <div className="absolute top-1.5 right-3 z-30 flex items-center gap-1 bg-steel-mist/80 backdrop-blur border border-[color:var(--border)] rounded px-1.5 py-0.5">
       <button
         type="button"
         onClick={onZoomOut}
-        className="px-1.5 text-linen/80 hover:text-marigold text-sm leading-none"
+        className="px-1.5 text-warm-fog/80 hover:text-peach-neon text-sm leading-none"
         aria-label="zoom out"
       >
         −
@@ -253,19 +253,19 @@ function ZoomControls({
       <button
         type="button"
         onClick={onFit}
-        className="px-1.5 text-[10px] text-twilight hover:text-linen uppercase tracking-wider"
+        className="px-1.5 text-[10px] text-patina hover:text-warm-fog uppercase tracking-wider"
       >
         fit
       </button>
       <button
         type="button"
         onClick={onZoomIn}
-        className="px-1.5 text-linen/80 hover:text-marigold text-sm leading-none"
+        className="px-1.5 text-warm-fog/80 hover:text-peach-neon text-sm leading-none"
         aria-label="zoom in"
       >
         +
       </button>
-      <span className="text-[9px] text-twilight tabular-nums ml-1 border-l border-[color:var(--border)] pl-1.5">
+      <span className="text-[9px] text-patina tabular-nums ml-1 border-l border-[color:var(--border)] pl-1.5">
         {fmtScale(pxPerMs)}
       </span>
     </div>
@@ -301,12 +301,12 @@ function TimelineRow({
           onSelect(row.span);
         }
       }}
-      className={`flex border-b border-[color:var(--border)]/50 cursor-pointer hover:bg-linen/[0.03] ${
+      className={`flex border-b border-[color:var(--border)]/50 cursor-pointer hover:bg-warm-fog/[0.03] ${
         selected ? "bg-aether-teal/10" : ""
       }`}
     >
       <div
-        className="flex-shrink-0 sticky left-0 z-10 bg-midnight flex items-center gap-2 px-3 py-1.5"
+        className="flex-shrink-0 sticky left-0 z-10 bg-carbon flex items-center gap-2 px-3 py-1.5"
         style={{ width: LABEL_WIDTH, paddingLeft: `${row.depth * 12 + 12}px` }}
       >
         <span
@@ -315,7 +315,7 @@ function TimelineRow({
         >
           {row.kind}
         </span>
-        <span className="flex-1 truncate text-linen">{row.span.name}</span>
+        <span className="flex-1 truncate text-warm-fog">{row.span.name}</span>
       </div>
       <div
         className="relative h-7 flex-shrink-0"
@@ -327,8 +327,8 @@ function TimelineRow({
             left: leftPx,
             width: widthPx,
             background: swatch.bg,
-            border: `1px solid ${selected ? DRIFT.marigold : swatch.border}`,
-            boxShadow: selected ? `0 0 0 1px ${DRIFT.marigold}66` : undefined,
+            border: `1px solid ${selected ? AETHER.peachNeon : swatch.border}`,
+            boxShadow: selected ? `0 0 0 1px ${AETHER.peachNeon}66` : undefined,
           }}
           title={`${row.span.name} · ${fmtDuration(row.durationMs)}`}
         >
@@ -342,7 +342,7 @@ function TimelineRow({
             className="absolute top-1.5 bottom-1.5 flex items-center pl-1"
             style={{ left: leftPx + widthPx }}
           >
-            <span className="text-coral">!</span>
+            <span className="text-warn">!</span>
           </div>
         ) : null}
       </div>

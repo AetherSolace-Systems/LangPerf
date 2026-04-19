@@ -7,7 +7,7 @@
  * Convention (read before adding colors):
  *   - Kind-aware colors (LLM/tool/agent/reasoning/trajectory node borders,
  *     tag chips, role-coded message cards) MUST come from kindSwatch() /
- *     roleSwatch() / tagSwatch() or the DRIFT palette below. Don't hardcode
+ *     roleSwatch() / tagSwatch() or the AETHER palette below. Don't hardcode
  *     hexes or one-off Tailwind color classes — it breaks cross-view sync.
  *   - Structural colors (page backgrounds, panel borders, muted helper
  *     text, scrollbars) stay on CSS variables (`var(--border)`,
@@ -16,35 +16,19 @@
  */
 
 /**
- * Aether Dusk palette. `DRIFT` export retained as an alias so existing
- * imports continue to work; prefer `AETHER` in new code.
+ * Aether Dusk palette. All kind/role/tag swatches derive from these hexes
+ * so a single edit here recolors the entire app in lockstep with
+ * tailwind.config.ts.
  */
 export const AETHER = {
-  carbon: "#181D21",           // Page background (was DRIFT.midnight)
-  steelMist: "#242D32",        // Cards / surfaces (was DRIFT.deepIndigo)
+  carbon: "#181D21",           // Page background
+  steelMist: "#242D32",        // Cards / surfaces
   surface2: "#1F272B",         // Secondary surface (rail, identity strip)
-  aetherTeal: "#6BBAB1",       // Primary accent (was DRIFT.driftViolet)
-  peachNeon: "#E8A87C",        // Secondary accent (was DRIFT.marigold)
-  warmFog: "#F2EAE2",          // Text (was DRIFT.linen)
-  patina: "#7A8B8E",           // Muted text (was DRIFT.twilight)
+  aetherTeal: "#6BBAB1",       // Primary accent
+  peachNeon: "#E8A87C",        // Secondary accent
+  warmFog: "#F2EAE2",          // Text
+  patina: "#7A8B8E",           // Muted text
   warn: "#D98A6A",             // Errors / bad tags
-} as const;
-
-export const DRIFT = {
-  // Legacy alias — values repointed to Aether Dusk so existing imports adopt
-  // the new palette without rewiring. Prefer AETHER in new code.
-  midnight: AETHER.carbon,
-  deepIndigo: AETHER.steelMist,
-  driftViolet: AETHER.aetherTeal,
-  marigold: AETHER.peachNeon,
-  linen: AETHER.warmFog,
-  twilight: AETHER.patina,
-
-  // Extended hues collapsed into the reduced Aether Dusk palette.
-  lagoon: AETHER.aetherTeal,
-  plum: AETHER.peachNeon,
-  coral: AETHER.warn,
-  sage: AETHER.aetherTeal,
 } as const;
 
 function rgba(hex: string, alpha: number): string {
@@ -70,18 +54,18 @@ const mk = (hex: string): Swatch => ({
 });
 
 export const KIND: Record<string, Swatch> = {
-  llm: mk(DRIFT.driftViolet),
-  tool: mk(DRIFT.marigold),
-  tool_call: mk(DRIFT.marigold),
-  agent: mk(DRIFT.lagoon),
-  chain: mk(DRIFT.marigold),
-  retriever: mk(DRIFT.plum),
-  embedding: mk(DRIFT.sage),
-  reasoning: mk(DRIFT.plum),
-  trajectory: mk(DRIFT.linen),
+  llm: mk(AETHER.aetherTeal),
+  tool: mk(AETHER.peachNeon),
+  tool_call: mk(AETHER.peachNeon),
+  agent: mk(AETHER.aetherTeal),
+  chain: mk(AETHER.peachNeon),
+  retriever: mk(AETHER.peachNeon),
+  embedding: mk(AETHER.aetherTeal),
+  reasoning: mk(AETHER.peachNeon),
+  trajectory: mk(AETHER.warmFog),
 };
 
-export const DEFAULT_KIND = mk(DRIFT.twilight);
+export const DEFAULT_KIND = mk(AETHER.patina);
 
 export function kindSwatch(kind: string | null | undefined): Swatch {
   if (!kind) return DEFAULT_KIND;
@@ -89,11 +73,11 @@ export function kindSwatch(kind: string | null | undefined): Swatch {
 }
 
 export const ROLE: Record<string, Swatch> = {
-  system: mk(DRIFT.marigold),
-  user: mk(DRIFT.lagoon),
-  assistant: mk(DRIFT.driftViolet),
-  tool: mk(DRIFT.plum),
-  developer: mk(DRIFT.coral),
+  system: mk(AETHER.peachNeon),
+  user: mk(AETHER.aetherTeal),
+  assistant: mk(AETHER.aetherTeal),
+  tool: mk(AETHER.peachNeon),
+  developer: mk(AETHER.warn),
 };
 
 export function roleSwatch(role: string): Swatch {
@@ -101,10 +85,10 @@ export function roleSwatch(role: string): Swatch {
 }
 
 export const TAG: Record<string, Swatch> = {
-  good: mk(DRIFT.sage),
-  bad: mk(DRIFT.coral),
-  interesting: mk(DRIFT.driftViolet),
-  todo: mk(DRIFT.marigold),
+  good: mk(AETHER.aetherTeal),
+  bad: mk(AETHER.warn),
+  interesting: mk(AETHER.aetherTeal),
+  todo: mk(AETHER.peachNeon),
 };
 
 export function tagSwatch(tag: string | null): Swatch {

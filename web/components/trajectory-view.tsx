@@ -62,14 +62,14 @@ function TrajectoryLayout({ trajectory }: { trajectory: TrajectoryDetail }) {
           <span className="text-xs text-warm-fog/90 truncate">
             {trajectory.name ?? "(unnamed)"}
           </span>
-          <span className="text-xs font-mono text-twilight">
+          <span className="text-xs font-mono text-patina">
             {trajectory.id.slice(0, 8)}…
           </span>
           <div className="flex-1" />
           <button
             type="button"
             onClick={() => toggleFs()}
-            className="text-[10px] uppercase tracking-wider text-twilight hover:text-warm-fog border border-[color:var(--border)] rounded px-2 py-0.5"
+            className="text-[10px] uppercase tracking-wider text-patina hover:text-warm-fog border border-[color:var(--border)] rounded px-2 py-0.5"
             title="Exit full-screen (Esc)"
           >
             exit full-screen
@@ -91,37 +91,37 @@ function TrajectoryLayout({ trajectory }: { trajectory: TrajectoryDetail }) {
   return (
     <div data-fs="0" className="h-screen flex flex-col">
       <header className="border-b border-[color:var(--border)] px-6 py-3 flex-shrink-0">
-        <Link href="/" className="text-xs text-twilight hover:text-linen">
+        <Link href="/" className="text-xs text-patina hover:text-warm-fog">
           ← all trajectories
         </Link>
         <div className="mt-1 flex items-baseline gap-3 flex-wrap">
           <h1 className="text-base font-semibold tracking-tight">
             {trajectory.name ?? (
-              <em className="text-twilight font-normal">(unnamed)</em>
+              <em className="text-patina font-normal">(unnamed)</em>
             )}
           </h1>
-          <span className="text-xs font-mono text-twilight">
+          <span className="text-xs font-mono text-patina">
             {trajectory.id.slice(0, 8)}…
           </span>
           <Dot />
-          <span className="text-xs text-twilight">
+          <span className="text-xs text-patina">
             {trajectory.service_name}
             {trajectory.environment ? ` · ${trajectory.environment}` : ""}
           </span>
           <Dot />
-          <span className="text-xs text-twilight tabular-nums">
+          <span className="text-xs text-patina tabular-nums">
             {trajectory.step_count} step{trajectory.step_count === 1 ? "" : "s"}
           </span>
           <Dot />
-          <span className="text-xs text-twilight tabular-nums">
+          <span className="text-xs text-patina tabular-nums">
             {trajectory.token_count.toLocaleString()}t
           </span>
           <Dot />
-          <span className="text-xs text-twilight tabular-nums">
+          <span className="text-xs text-patina tabular-nums">
             {fmtDuration(trajectory.duration_ms)}
           </span>
           <Dot />
-          <span className="text-xs text-twilight">
+          <span className="text-xs text-patina">
             <ClientTime iso={trajectory.started_at} />
           </span>
         </div>
@@ -134,7 +134,7 @@ function TrajectoryLayout({ trajectory }: { trajectory: TrajectoryDetail }) {
           <button
             type="button"
             onClick={() => setNotesOpen((v) => !v)}
-            className="text-[10px] uppercase tracking-wider text-twilight hover:text-linen border border-[color:var(--border)] rounded px-2 py-0.5"
+            className="text-[10px] uppercase tracking-wider text-patina hover:text-warm-fog border border-[color:var(--border)] rounded px-2 py-0.5"
           >
             {notesOpen ? "hide notes" : trajectory.notes ? "notes" : "+ notes"}
           </button>
@@ -196,7 +196,7 @@ function TrajectoryLayout({ trajectory }: { trajectory: TrajectoryDetail }) {
 }
 
 function Dot() {
-  return <span className="text-xs text-twilight">·</span>;
+  return <span className="text-xs text-patina">·</span>;
 }
 
 function SectionHeader({
@@ -207,7 +207,7 @@ function SectionHeader({
   right?: React.ReactNode;
 }) {
   return (
-    <div className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-twilight bg-midnight/40 flex-shrink-0 border-b border-[color:var(--border)] flex items-center justify-between">
+    <div className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-patina bg-carbon/40 flex-shrink-0 border-b border-[color:var(--border)] flex items-center justify-between">
       <span>{label}</span>
       {right}
     </div>
@@ -230,7 +230,7 @@ function ToggleButton({
       className={`px-2 py-0.5 rounded border text-[10px] uppercase tracking-wider transition-colors ${
         active
           ? "border-aether-teal text-aether-teal bg-aether-teal/10"
-          : "border-[color:var(--border)] text-twilight hover:text-linen hover:border-twilight"
+          : "border-[color:var(--border)] text-patina hover:text-warm-fog hover:border-patina"
       }`}
     >
       {children}
