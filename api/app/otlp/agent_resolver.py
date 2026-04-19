@@ -75,7 +75,10 @@ async def resolve_agent_and_version(
 
     git_sha = resource_attrs.get(ATTR_AGENT_VERSION_SHA)
     short_sha = resource_attrs.get(ATTR_AGENT_VERSION_SHORT_SHA)
-    package_version = resource_attrs.get(ATTR_AGENT_VERSION_PACKAGE)
+    # Fall back to OTel semconv `service.version` when the custom
+    # langperf attribute isn't set — this makes the SDK's version=
+    # kwarg (Task 6) show up in AgentVersion rows.
+    package_version = resource_attrs.get(ATTR_AGENT_VERSION_PACKAGE) or resource_attrs.get("service.version")
 
     if not any((git_sha, short_sha, package_version)):
         # No version attributes — skip version tracking for this trace.
