@@ -101,15 +101,17 @@ function isExpanded(node: LayoutNode, ctx: LayoutCtx): boolean {
   return ctx.expandAll || ctx.expandedIds.has(node.span.span_id);
 }
 
-// Agent frames always lay out horizontally — linear sub-agent work reads
-// naturally left-to-right. Expanded step children just make the frame wider;
-// React Flow's pan/zoom handles the rest.
+// Agent frames lay out horizontally when their direct children are all
+// leaf steps (linear sub-agent work reads left-to-right). If any child is
+// itself a frame (nested sub-agent, parallel group), fall back to vertical
+// so nested layouts don't cascade into impossibly wide rows.
 function shouldLayoutHorizontally(
   frame: LayoutNode,
-  _children: LayoutNode[],
+  children: LayoutNode[],
   _ctx: LayoutCtx,
 ): boolean {
-  return frame.frameKind === "agent";
+  if (frame.frameKind !== "agent") return false;
+  return children.every((c) => c.kind === "step");
 }
 
 function endMsOf(s: Span): number {
