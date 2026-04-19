@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import type { TrajectoryDetail } from "@/lib/api";
 import { fmtDuration } from "@/lib/format";
@@ -10,6 +9,8 @@ import { NodeDetailPanel } from "@/components/node-detail-panel";
 import { NotesEditor } from "@/components/notes-editor";
 import { FullscreenProvider } from "@/components/graph/fullscreen-context";
 import { useFullscreen } from "@/components/graph/fullscreen-context";
+import { useGraphKeyboard } from "@/components/graph/use-graph-keyboard";
+import { useGraphUrlSync } from "@/components/graph/use-graph-url-sync";
 import { SelectionProvider } from "@/components/selection-context";
 import { TagSelector } from "@/components/tag-selector";
 import { TrajectoryGraph } from "@/components/trajectory-graph";
@@ -35,58 +36,20 @@ function TrajectoryLayout({ trajectory }: { trajectory: TrajectoryDetail }) {
   const [lowerView, setLowerView] = useState<LowerView>("timeline");
   const commentCounts = useCommentCounts(trajectory);
   const { fsOpen, toggleFs, toggleExpandAll, collapseAll, setFs } = useFullscreen();
-  const router = useRouter();
-  const pathname = usePathname();
-  const params = useSearchParams();
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.isContentEditable)
-      )
-        return;
-      if (e.key === "f" || e.key === "F") {
-        e.preventDefault();
-        toggleFs();
-      } else if (e.key === "Escape" && fsOpen) {
-        e.preventDefault();
-        toggleFs();
-      } else if (e.key === "e" || e.key === "E") {
-        e.preventDefault();
-        toggleExpandAll();
-      } else if (e.key === "c" || e.key === "C") {
-        e.preventDefault();
-        collapseAll();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [fsOpen, toggleFs, toggleExpandAll, collapseAll]);
+  const exitFullscreen = useCallback((): boolean => {
+    if (!fsOpen) return false;
+    setFs(false);
+    return true;
+  }, [fsOpen, setFs]);
 
-  // On mount, sync fsOpen FROM URL
-  useEffect(() => {
-    const want = params.get("fs") === "1";
-    if (want !== fsOpen) setFs(want);
-    // intentionally only on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // When fsOpen changes, push URL
-  useEffect(() => {
-    const want = fsOpen ? "1" : null;
-    const current = params.get("fs");
-    if (current !== want) {
-      const sp = new URLSearchParams(params.toString());
-      if (want) sp.set("fs", want);
-      else sp.delete("fs");
-      const q = sp.toString();
-      router.replace(q ? `${pathname}?${q}` : pathname);
-    }
-  }, [fsOpen, params, router, pathname]);
+  useGraphKeyboard({
+    toggleFullscreen: toggleFs,
+    exitFullscreen,
+    expandAll: toggleExpandAll,
+    collapseAll,
+  });
+  useGraphUrlSync(fsOpen, setFs);
 
   if (fsOpen) {
     return (
