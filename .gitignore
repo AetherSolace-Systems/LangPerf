@@ -46,6 +46,7 @@ gen_agent/
 /web/playwright-report/
 /web/blob-report/
 /web/playwright/.cache/
+/web/tests/.auth/
 
 # Git worktrees
 .worktrees/
