@@ -27,7 +27,12 @@ the `openai` SDK (or an OpenAI-compatible endpoint like LM Studio).
 ```python
 import langperf, openai
 
-langperf.init(endpoint="http://localhost:4318", service_name="my-agent")
+langperf.init(
+    api_token="lp_...",
+    agent_name="weather-bot",
+    environment="prod",
+    version="1.2.3",
+)
 
 client = openai.OpenAI(base_url="http://localhost:1234/v1", api_key="lm-studio")
 client.chat.completions.create(model="gpt-oss-20b", messages=[...])
@@ -36,14 +41,17 @@ client.chat.completions.create(model="gpt-oss-20b", messages=[...])
 Everything flowing through the `openai` SDK is captured automatically — messages,
 tool calls, token counts, timing, model name.
 
+**Note:** `service_name` is deprecated; use `agent_name` instead.
+
 ## Environment variables
 
 - `LANGPERF_API_TOKEN` — **required**; per-agent bearer token minted in the
   UI when you register the agent. Rotating the token in the UI invalidates
   the old one immediately.
 - `LANGPERF_ENDPOINT` — OTLP endpoint base URL (default `http://localhost:4318`)
-- `LANGPERF_SERVICE_NAME` — service name shown in the UI
+- `LANGPERF_SERVICE_NAME` — *(deprecated; use `agent_name` kwarg)* — service name shown in the UI
 - `LANGPERF_ENVIRONMENT` — maps to OTel `deployment.environment`
+- `LANGPERF_VERSION` — sets `service.version` attribute on OTel resource
 
 ## Upgrade notes
 

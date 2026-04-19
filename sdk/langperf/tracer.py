@@ -25,7 +25,9 @@ def init(
     *,
     endpoint: Optional[str] = None,
     service_name: Optional[str] = None,
+    agent_name: Optional[str] = None,
     environment: Optional[str] = None,
+    version: Optional[str] = None,
     api_token: Optional[str] = None,
 ) -> TracerProvider:
     """Configure LangPerf.
@@ -44,7 +46,7 @@ def init(
 
     Env vars:
         LANGPERF_ENDPOINT       default: http://localhost:4318
-        LANGPERF_SERVICE_NAME   default: "langperf-agent"
+        LANGPERF_SERVICE_NAME   default: "langperf-agent" (deprecated; use agent_name)
         LANGPERF_ENVIRONMENT    default: (unset)
         LANGPERF_API_TOKEN      required — per-agent bearer token minted in
                                 the UI when you register the agent.
@@ -53,9 +55,21 @@ def init(
         logger.debug("langperf.init() called more than once; ignoring subsequent call")
         return _state["provider"]
 
+    # Deprecation shim for service_name -> agent_name
+    if service_name is not None and agent_name is None:
+        logger.warning(
+            "langperf.init(service_name=...) is deprecated; pass agent_name= instead"
+        )
+        agent_name = service_name
+    elif service_name is not None and agent_name is not None:
+        logger.warning(
+            "langperf.init got both service_name and agent_name; agent_name wins"
+        )
+
     endpoint = endpoint or os.environ.get("LANGPERF_ENDPOINT", "http://localhost:4318")
-    service_name = service_name or os.environ.get("LANGPERF_SERVICE_NAME", "langperf-agent")
+    agent_name = agent_name or os.environ.get("LANGPERF_SERVICE_NAME", "langperf-agent")
     environment = environment or os.environ.get("LANGPERF_ENVIRONMENT")
+    version = version or os.environ.get("LANGPERF_VERSION")
     token = api_token or os.environ.get("LANGPERF_API_TOKEN")
     if not token:
         raise RuntimeError(
@@ -70,12 +84,14 @@ def init(
     identity = detect_identity(caller_stack_offset=3)
 
     resource_attrs: dict[str, object] = {
-        "service.name": service_name,
+        "service.name": agent_name,
         "langperf.agent.signature": identity.signature,
         "langperf.agent.language": identity.language,
     }
     if environment:
         resource_attrs["deployment.environment"] = environment
+    if version:
+        resource_attrs["service.version"] = version
     if identity.git_origin:
         resource_attrs["langperf.agent.git_origin"] = identity.git_origin
     if identity.git_sha:
@@ -103,7 +119,7 @@ def init(
     _state["identity"] = identity
     logger.info(
         "langperf initialized: service=%s endpoint=%s env=%s signature=%s version=%s",
-        service_name,
+        agent_name,
         endpoint,
         environment or "-",
         identity.signature,
