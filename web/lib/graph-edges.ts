@@ -52,15 +52,12 @@ export function buildEdges(spans: Span[]): Edge<LabelledEdgeData>[] {
       (a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime(),
     );
     const groups = groupByParallel(siblings);
-    // Fan-out / fan-in between consecutive groups. Within a group (parallel
-    // siblings), there is no sequential edge — they share a predecessor and a
-    // successor, not each other.
     for (let gi = 1; gi < groups.length; gi++) {
       const prev = groups[gi - 1];
       const curr = groups[gi];
       for (const from of prev) {
         for (const to of curr) {
-          const label = edgeLabel(from, to);
+          const label = edgeLabel(from, to, byParent);
           const payload = edgePayload(from, to);
           edges.push({
             id: `e-${from.span_id}-${to.span_id}`,
@@ -78,7 +75,25 @@ export function buildEdges(spans: Span[]): Edge<LabelledEdgeData>[] {
   return edges;
 }
 
-function edgeLabel(from: Span, to: Span): string {
+// Walk down from an agent frame to the leaf whose run-time ends last — that
+// leaf is "the step that produced the value flowing out."
+function exitLeaf(span: Span, byParent: Map<string | null, Span[]>): Span {
+  const children = byParent.get(span.span_id) ?? [];
+  if (children.length === 0) return span;
+  const sorted = [...children].sort((a, b) => endMs(b) - endMs(a));
+  return exitLeaf(sorted[0], byParent);
+}
+
+function shortName(name: string, max = 28): string {
+  if (name.length <= max) return name;
+  return name.slice(0, max - 1) + "…";
+}
+
+function edgeLabel(
+  from: Span,
+  to: Span,
+  byParent: Map<string | null, Span[]>,
+): string {
   const fromKind = kindOf(from);
   const toKind = kindOf(to);
   if (fromKind === "llm" && toKind === "tool") {
@@ -88,7 +103,11 @@ function edgeLabel(from: Span, to: Span): string {
   if (fromKind === "tool" && toKind === "llm") return "return";
   if (fromKind === "llm" && toKind === "llm") return "message";
   if (toKind === "agent") return `delegate:${to.name ?? "agent"}`;
-  if (fromKind === "agent") return "resume";
+  if (fromKind === "agent") {
+    const leaf = exitLeaf(from, byParent);
+    if (leaf.span_id === from.span_id) return "resume";
+    return `resume ← ${shortName(leaf.name)}`;
+  }
   if (fromKind === "tool" && toKind === "tool") return "next-tool";
   return "next";
 }
