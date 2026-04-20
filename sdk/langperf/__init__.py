@@ -17,4 +17,4 @@ __all__ = [
     "set_user",
     "current_trajectory_id",
 ]
-__version__ = "0.2.0"
+__version__ = "0.2.1"

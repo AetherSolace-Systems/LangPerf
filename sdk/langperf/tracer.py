@@ -42,16 +42,24 @@ def init(
     backend can attribute every run to a first-class Agent entity without
     any user registration.
 
+    Identity: the **bearer token** is the source of truth for which
+    Agent these traces belong to. ``agent_name=`` is optional and
+    advisory — the backend uses the Agent's registered name for display
+    regardless of what you pass here. The kwarg is still honored as an
+    OTel ``service.name`` resource attribute for interop with other OTel
+    tooling, but you no longer need to keep it in sync with the UI.
+
     Resolution order for each kwarg: explicit kwarg > env var > default.
 
     Env vars:
         LANGPERF_ENDPOINT       default: http://localhost:4318
-        LANGPERF_AGENT_NAME     default: "langperf-agent"
+        LANGPERF_AGENT_NAME     optional; advisory only. default: "langperf-agent"
         LANGPERF_SERVICE_NAME   deprecated alias for LANGPERF_AGENT_NAME
         LANGPERF_ENVIRONMENT    default: (unset)
         LANGPERF_VERSION        default: (unset)
         LANGPERF_API_TOKEN      required — per-agent bearer token minted in
-                                the UI when you register the agent.
+                                the UI when you register the agent. Identifies
+                                the Agent on its own; no other args needed.
     """
     if _state["initialized"]:
         logger.debug("langperf.init() called more than once; ignoring subsequent call")

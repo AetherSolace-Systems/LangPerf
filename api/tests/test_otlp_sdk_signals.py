@@ -163,6 +163,34 @@ async def test_mark_signals_only_read_from_trajectory_kind_span(session):
 
 
 @pytest.mark.asyncio
+async def test_trajectory_service_name_comes_from_authoritative_agent(session):
+    """The bearer token identifies the agent — the SDK's advisory
+    `service.name` must not overwrite `Trajectory.service_name`.
+    Regression test for the "agent name and api key have to match?" UX
+    feedback: they shouldn't, and they don't."""
+    org, agent = await _seed_org_and_agent(session)
+    traj_id = str(uuid.uuid4())
+    bundle: DecodedBundle = {
+        # SDK sent a `service.name` that doesn't match the registered Agent.
+        "resource": {"attrs": {"service.name": "something-the-user-mistyped"}},
+        "spans": [
+            _make_span(
+                trajectory_id=traj_id,
+                trace_id="a" * 32,
+                span_id="b" * 16,
+                kind="trajectory",
+            )
+        ],
+    }
+
+    await ingest_bundles(session, [bundle], org_id=org.id, agent=agent)
+    await session.commit()
+
+    traj = await session.get(Trajectory, traj_id)
+    assert traj.service_name == agent.name
+
+
+@pytest.mark.asyncio
 async def test_mark_unknown_tag_rejected(session):
     """Unknown tag values stay out of the filter column — UI expects a
     closed set (`good`/`bad`/`interesting`/`todo`)."""

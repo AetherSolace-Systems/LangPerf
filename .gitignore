@@ -54,3 +54,4 @@ gen_agent/
 
 # Git worktrees
 .worktrees/
+.claude/
