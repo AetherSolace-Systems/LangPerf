@@ -19,11 +19,13 @@ export async function fetchMode(): Promise<AuthMode> {
 
 export async function fetchMe(): Promise<CurrentUser | null> {
   try {
-    const body = await apiFetch<{ user: CurrentUser | null }>(`/api/auth/me`);
+    // allowUnauthorized so apiFetch doesn't redirect to /login on 401 —
+    // the login page itself calls this and expects null for "not signed in".
+    const body = await apiFetch<{ user: CurrentUser | null }>(`/api/auth/me`, {
+      allowUnauthorized: true,
+    });
     return body.user;
   } catch (err) {
-    // 401 is the expected "not signed in" signal — surface as null so the
-    // login flow can react. Any other error is real and should bubble up.
     if (err instanceof ApiError && err.status === 401) return null;
     throw err;
   }

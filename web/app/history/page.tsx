@@ -7,6 +7,7 @@ import {
 } from "@/components/shell/context-sidebar";
 import { Chip } from "@/components/ui/chip";
 import { listRuns, type AgentRunsResponse } from "@/lib/api";
+import { isRedirectError } from "@/lib/fetch-utils";
 import { RunsTable } from "@/components/agent/runs-table";
 import { PatternInput } from "@/components/history/pattern-input";
 
@@ -41,6 +42,7 @@ export default async function History({
   try {
     runs = await listRuns({ pattern, tag, q, limit: 100 });
   } catch (err) {
+    if (isRedirectError(err)) throw err;
     return (
       <AppShell
         topBar={{

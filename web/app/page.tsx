@@ -13,6 +13,7 @@ import {
   type OverviewResponse,
   type TimeWindow,
 } from "@/lib/api";
+import { isRedirectError } from "@/lib/fetch-utils";
 import { KpiStrip } from "@/components/dashboard/kpi-strip";
 import { AgentGrid } from "@/components/dashboard/agent-grid";
 import { TopTools } from "@/components/dashboard/top-tools";
@@ -87,6 +88,7 @@ export default async function Dashboard({
     overview = ov;
     agents = ag as AgentSummaryWithMetrics[];
   } catch (err) {
+    if (isRedirectError(err)) throw err;
     return (
       <AppShell
         topBar={{

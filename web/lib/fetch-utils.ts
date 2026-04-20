@@ -21,6 +21,10 @@ export type FetchOpts = {
   headers?: Record<string, string>; // merged with auth + content-type
   signal?: AbortSignal;
   cache?: RequestCache; // default "no-store"
+  // Set true on endpoints where a 401 is an expected / informational result
+  // (e.g. /api/auth/me from the login page). Default false means the
+  // server-side branch of apiFetch redirects to /login on 401.
+  allowUnauthorized?: boolean;
 };
 
 async function buildInit(opts: FetchOpts): Promise<RequestInit> {
@@ -61,6 +65,16 @@ async function buildInit(opts: FetchOpts): Promise<RequestInit> {
   return init;
 }
 
+// Next's redirect() throws an error with a NEXT_REDIRECT digest that its
+// router catches up-stack. Generic `catch (err)` blocks in page components
+// otherwise swallow the redirect; re-throw when you see this so the router
+// can do its job.
+export function isRedirectError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const digest = (err as { digest?: unknown }).digest;
+  return typeof digest === "string" && digest.startsWith("NEXT_REDIRECT");
+}
+
 export class ApiError extends Error {
   readonly status: number;
   readonly url: string;
@@ -72,7 +86,24 @@ export class ApiError extends Error {
   }
 }
 
-async function throwFromResponse(resp: Response, url: string): Promise<never> {
+async function throwFromResponse(resp: Response, url: string, opts: FetchOpts): Promise<never> {
+  // Stale / missing / invalid session cookie — on the server, bounce the
+  // user to /login instead of surfacing as an opaque "Could not reach
+  // langperf-api" error. Skip for endpoints where the caller explicitly
+  // opts out (e.g. fetchMe used by the login page).
+  if (resp.status === 401 && typeof window === "undefined" && !opts.allowUnauthorized) {
+    let redirectFn: ((url: string) => never) | null = null;
+    try {
+      const nav = await import("next/navigation");
+      redirectFn = nav.redirect;
+    } catch {
+      // next/navigation unavailable (build time etc.) — fall through to throw.
+    }
+    // Call redirect() OUTSIDE the try/catch so its NEXT_REDIRECT throw
+    // isn't swallowed.
+    if (redirectFn) redirectFn("/login");
+  }
+
   let detail: string | undefined;
   try {
     const body = (await resp.json()) as { detail?: unknown };
@@ -88,7 +119,7 @@ export async function apiFetch<T>(path: string, opts: FetchOpts = {}): Promise<T
   const url = `${apiBase()}${path}`;
   const init = await buildInit(opts);
   const resp = await fetch(url, init);
-  if (!resp.ok) await throwFromResponse(resp, url);
+  if (!resp.ok) await throwFromResponse(resp, url, opts);
   return (await resp.json()) as T;
 }
 
@@ -97,5 +128,5 @@ export async function apiFetchVoid(path: string, opts: FetchOpts = {}): Promise<
   const url = `${apiBase()}${path}`;
   const init = await buildInit(opts);
   const resp = await fetch(url, init);
-  if (!resp.ok) await throwFromResponse(resp, url);
+  if (!resp.ok) await throwFromResponse(resp, url, opts);
 }

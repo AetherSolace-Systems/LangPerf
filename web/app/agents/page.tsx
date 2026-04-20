@@ -2,6 +2,7 @@ import { AppShell } from "@/components/shell/app-shell";
 import { AgentsTable } from "@/components/agents/agents-table";
 import { Chip } from "@/components/ui/chip";
 import { listAgents, type AgentSummary } from "@/lib/api";
+import { isRedirectError } from "@/lib/fetch-utils";
 import { listProjects, type Project } from "@/lib/projects";
 import { ProjectFilter } from "@/components/projects/project-filter";
 
@@ -23,6 +24,7 @@ export default async function AgentsPage({
       listProjects(),
     ]);
   } catch (err) {
+    if (isRedirectError(err)) throw err;
     return (
       <AppShell
         topBar={{
