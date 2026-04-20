@@ -29,7 +29,6 @@ export function TopBar({ breadcrumb, right, hideSearch = false }: TopBarProps) {
             placeholder="⌘k · fuzzy · my_agent.*.*"
             className="w-full bg-[color:var(--background)] border border-[color:var(--border)] rounded-[3px] px-[10px] py-[5px] text-[11px] font-mono text-warm-fog placeholder:text-patina focus:outline-none focus:border-[color:var(--border-strong)]"
             disabled
-            aria-disabled="true"
             title="Global search lands in a follow-up plan"
           />
         </div>

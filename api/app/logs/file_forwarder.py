@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.settings import KEY_LOG_FORWARDING, LogForwardingConfig, _load
 from app.db import SessionLocal
+from app.ingest.org import get_default_org_id
 from app.logs.buffer import LogEvent, buffer
 
 logger = logging.getLogger("langperf.logs.file_forwarder")
@@ -31,7 +32,8 @@ _RELOAD_INTERVAL_SECONDS = 10.0
 
 async def _current_config() -> LogForwardingConfig:
     async with SessionLocal() as session:
-        raw = await _load(session, KEY_LOG_FORWARDING)
+        org_id = await get_default_org_id(session)
+        raw = await _load(session, org_id, KEY_LOG_FORWARDING)
     if raw is None:
         return LogForwardingConfig()
     return LogForwardingConfig.model_validate(raw)
@@ -82,6 +84,11 @@ async def run() -> None:
                 try:
                     current_config = await _current_config()
                 except Exception as exc:  # noqa: BLE001 — bg task must not die
+                    # Fall back to a disabled default so the loop can progress.
+                    # Without this, a reload failure leaves current_config=None,
+                    # and BufferHandler captures our own warning → wakes the
+                    # subscription → immediate retry → infinite loop.
+                    current_config = LogForwardingConfig()
                     logger.warning("config reload failed: %s", exc)
                 last_reload = now
 

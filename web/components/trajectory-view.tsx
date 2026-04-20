@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import type { TrajectoryDetail } from "@/lib/api";
 import { fmtDuration } from "@/lib/format";
@@ -10,6 +9,8 @@ import { NodeDetailPanel } from "@/components/node-detail-panel";
 import { NotesEditor } from "@/components/notes-editor";
 import { FullscreenProvider } from "@/components/graph/fullscreen-context";
 import { useFullscreen } from "@/components/graph/fullscreen-context";
+import { useGraphKeyboard } from "@/components/graph/use-graph-keyboard";
+import { useGraphUrlSync } from "@/components/graph/use-graph-url-sync";
 import { SelectionProvider } from "@/components/selection-context";
 import { TagSelector } from "@/components/tag-selector";
 import { TrajectoryGraph } from "@/components/trajectory-graph";
@@ -35,58 +36,20 @@ function TrajectoryLayout({ trajectory }: { trajectory: TrajectoryDetail }) {
   const [lowerView, setLowerView] = useState<LowerView>("timeline");
   const commentCounts = useCommentCounts(trajectory);
   const { fsOpen, toggleFs, toggleExpandAll, collapseAll, setFs } = useFullscreen();
-  const router = useRouter();
-  const pathname = usePathname();
-  const params = useSearchParams();
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.isContentEditable)
-      )
-        return;
-      if (e.key === "f" || e.key === "F") {
-        e.preventDefault();
-        toggleFs();
-      } else if (e.key === "Escape" && fsOpen) {
-        e.preventDefault();
-        toggleFs();
-      } else if (e.key === "e" || e.key === "E") {
-        e.preventDefault();
-        toggleExpandAll();
-      } else if (e.key === "c" || e.key === "C") {
-        e.preventDefault();
-        collapseAll();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [fsOpen, toggleFs, toggleExpandAll, collapseAll]);
+  const exitFullscreen = useCallback((): boolean => {
+    if (!fsOpen) return false;
+    setFs(false);
+    return true;
+  }, [fsOpen, setFs]);
 
-  // On mount, sync fsOpen FROM URL
-  useEffect(() => {
-    const want = params.get("fs") === "1";
-    if (want !== fsOpen) setFs(want);
-    // intentionally only on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // When fsOpen changes, push URL
-  useEffect(() => {
-    const want = fsOpen ? "1" : null;
-    const current = params.get("fs");
-    if (current !== want) {
-      const sp = new URLSearchParams(params.toString());
-      if (want) sp.set("fs", want);
-      else sp.delete("fs");
-      const q = sp.toString();
-      router.replace(q ? `${pathname}?${q}` : pathname);
-    }
-  }, [fsOpen, params, router, pathname]);
+  useGraphKeyboard({
+    toggleFullscreen: toggleFs,
+    exitFullscreen,
+    expandAll: toggleExpandAll,
+    collapseAll,
+  });
+  useGraphUrlSync(fsOpen, setFs);
 
   if (fsOpen) {
     return (
@@ -99,14 +62,14 @@ function TrajectoryLayout({ trajectory }: { trajectory: TrajectoryDetail }) {
           <span className="text-xs text-warm-fog/90 truncate">
             {trajectory.name ?? "(unnamed)"}
           </span>
-          <span className="text-xs font-mono text-twilight">
+          <span className="text-xs font-mono text-patina">
             {trajectory.id.slice(0, 8)}…
           </span>
           <div className="flex-1" />
           <button
             type="button"
             onClick={() => toggleFs()}
-            className="text-[10px] uppercase tracking-wider text-twilight hover:text-warm-fog border border-[color:var(--border)] rounded px-2 py-0.5"
+            className="text-[10px] uppercase tracking-wider text-patina hover:text-warm-fog border border-[color:var(--border)] rounded px-2 py-0.5"
             title="Exit full-screen (Esc)"
           >
             exit full-screen
@@ -128,37 +91,37 @@ function TrajectoryLayout({ trajectory }: { trajectory: TrajectoryDetail }) {
   return (
     <div data-fs="0" className="h-screen flex flex-col">
       <header className="border-b border-[color:var(--border)] px-6 py-3 flex-shrink-0">
-        <Link href="/" className="text-xs text-twilight hover:text-linen">
+        <Link href="/" className="text-xs text-patina hover:text-warm-fog">
           ← all trajectories
         </Link>
         <div className="mt-1 flex items-baseline gap-3 flex-wrap">
           <h1 className="text-base font-semibold tracking-tight">
             {trajectory.name ?? (
-              <em className="text-twilight font-normal">(unnamed)</em>
+              <em className="text-patina font-normal">(unnamed)</em>
             )}
           </h1>
-          <span className="text-xs font-mono text-twilight">
+          <span className="text-xs font-mono text-patina">
             {trajectory.id.slice(0, 8)}…
           </span>
           <Dot />
-          <span className="text-xs text-twilight">
+          <span className="text-xs text-patina">
             {trajectory.service_name}
             {trajectory.environment ? ` · ${trajectory.environment}` : ""}
           </span>
           <Dot />
-          <span className="text-xs text-twilight tabular-nums">
+          <span className="text-xs text-patina tabular-nums">
             {trajectory.step_count} step{trajectory.step_count === 1 ? "" : "s"}
           </span>
           <Dot />
-          <span className="text-xs text-twilight tabular-nums">
+          <span className="text-xs text-patina tabular-nums">
             {trajectory.token_count.toLocaleString()}t
           </span>
           <Dot />
-          <span className="text-xs text-twilight tabular-nums">
+          <span className="text-xs text-patina tabular-nums">
             {fmtDuration(trajectory.duration_ms)}
           </span>
           <Dot />
-          <span className="text-xs text-twilight">
+          <span className="text-xs text-patina">
             <ClientTime iso={trajectory.started_at} />
           </span>
         </div>
@@ -171,7 +134,7 @@ function TrajectoryLayout({ trajectory }: { trajectory: TrajectoryDetail }) {
           <button
             type="button"
             onClick={() => setNotesOpen((v) => !v)}
-            className="text-[10px] uppercase tracking-wider text-twilight hover:text-linen border border-[color:var(--border)] rounded px-2 py-0.5"
+            className="text-[10px] uppercase tracking-wider text-patina hover:text-warm-fog border border-[color:var(--border)] rounded px-2 py-0.5"
           >
             {notesOpen ? "hide notes" : trajectory.notes ? "notes" : "+ notes"}
           </button>
@@ -233,7 +196,7 @@ function TrajectoryLayout({ trajectory }: { trajectory: TrajectoryDetail }) {
 }
 
 function Dot() {
-  return <span className="text-xs text-twilight">·</span>;
+  return <span className="text-xs text-patina">·</span>;
 }
 
 function SectionHeader({
@@ -244,7 +207,7 @@ function SectionHeader({
   right?: React.ReactNode;
 }) {
   return (
-    <div className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-twilight bg-midnight/40 flex-shrink-0 border-b border-[color:var(--border)] flex items-center justify-between">
+    <div className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-patina bg-carbon/40 flex-shrink-0 border-b border-[color:var(--border)] flex items-center justify-between">
       <span>{label}</span>
       {right}
     </div>
@@ -267,7 +230,7 @@ function ToggleButton({
       className={`px-2 py-0.5 rounded border text-[10px] uppercase tracking-wider transition-colors ${
         active
           ? "border-aether-teal text-aether-teal bg-aether-teal/10"
-          : "border-[color:var(--border)] text-twilight hover:text-linen hover:border-twilight"
+          : "border-[color:var(--border)] text-patina hover:text-warm-fog hover:border-patina"
       }`}
     >
       {children}

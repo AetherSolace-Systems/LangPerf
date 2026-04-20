@@ -91,11 +91,11 @@ export function RowActions({
       </div>
       {issued && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
           onClick={() => setIssued(null)}
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-warm-fog/5 p-6 ring-1 ring-aether-teal/20"
+            className="w-full max-w-md rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="mb-4 text-lg font-semibold text-aether-teal">

@@ -9,9 +9,29 @@ import dependency on the SDK would be the wrong direction.
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 ALLOWED_TAGS: frozenset[str] = frozenset(
     {"good", "bad", "interesting", "todo"}
 )
+
+# ── Rolling-window deltas for dashboard / metrics endpoints ──────────────
+WINDOW_DELTAS: dict[str, timedelta] = {
+    "24h": timedelta(hours=24),
+    "7d": timedelta(days=7),
+    "30d": timedelta(days=30),
+}
+
+# ── Default failure-mode seeds (slug, label, color) ──────────────────────
+# Duplicated verbatim in alembic migration 0010 — migrations are frozen,
+# so the literal there stays; this is the source of truth for runtime code.
+DEFAULT_FAILURE_MODES: list[tuple[str, str, str]] = [
+    ("wrong_tool", "Wrong tool", "warn"),
+    ("bad_args", "Bad args", "warn"),
+    ("hallucination", "Hallucination", "peach-neon"),
+    ("loop", "Loop", "peach-neon"),
+    ("misunderstood_intent", "Misunderstood intent", "steel-mist"),
+]
 
 # ── Span-attribute keys the LangPerf SDK stamps ──────────────────────────
 # Kept in sync with sdk/langperf/_baggage.py (ATTR_TRAJECTORY_*).

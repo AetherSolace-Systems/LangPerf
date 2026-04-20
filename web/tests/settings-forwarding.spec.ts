@@ -92,10 +92,10 @@ test.describe("Settings sidebar nav", () => {
     for (const label of [
       "Profile",
       "Environments",
+      "Projects",
       "Agents · auto-detected",
       "Log forwarding",
       "Agent trace export",
-      "SDK keys",
       "Webhooks",
     ]) {
       await expect(page.getByRole("link", { name: label })).toBeVisible();

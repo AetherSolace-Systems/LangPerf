@@ -27,7 +27,19 @@ Three services come up on your local machine:
 | `langperf-web`   | `3030` | Next.js UI                               |
 | `postgres`       | —      | Storage (named volume `postgres_data`)   |
 
-### 2. Instrument your agent
+### 2. Register your agent and grab a token
+
+Open [http://localhost:3030](http://localhost:3030), go to **Agents → + Add agent**
+to register a new agent and mint its API token (shown once). Then in your
+shell:
+
+```bash
+export LANGPERF_API_TOKEN=lp_xxxxxxxx_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+Without this the SDK raises `RuntimeError: LANGPERF_API_TOKEN is required` on first `init()`.
+
+### 3. Instrument your agent
 
 ```bash
 pip install -e ./sdk
@@ -38,7 +50,7 @@ import langperf, openai
 
 langperf.init(
     endpoint="http://localhost:4318",
-    service_name="my-agent",
+    agent_name="my-agent",
     environment="dev",
 )
 
@@ -58,7 +70,7 @@ langperf.flush()
 
 Open [http://localhost:3030](http://localhost:3030).
 
-### 3. Try the demo
+### 4. Try the demo
 
 ```bash
 python examples/lm_studio_agent.py
@@ -83,8 +95,11 @@ Four public symbols.
 | variable                    | purpose                                               |
 |-----------------------------|-------------------------------------------------------|
 | `LANGPERF_ENDPOINT`         | OTLP endpoint (default `http://localhost:4318`)       |
-| `LANGPERF_SERVICE_NAME`     | Service name shown in the UI                          |
+| `LANGPERF_AGENT_NAME`       | Agent name shown in the UI                            |
+| `LANGPERF_SERVICE_NAME`     | *(deprecated; use `LANGPERF_AGENT_NAME`)*             |
 | `LANGPERF_ENVIRONMENT`      | Maps to OTel `deployment.environment`                 |
+
+See [`.env.example`](./.env.example) for the full list of supported environment variables (API, web, Postgres, SDK, and test harness).
 
 ## UI features (v1)
 

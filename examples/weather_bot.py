@@ -78,7 +78,7 @@ def main() -> int:
 
     langperf.init(
         endpoint=os.environ.get("LANGPERF_ENDPOINT", "http://localhost:4318"),
-        service_name="weather-bot",
+        agent_name="weather-bot",
         environment=args.env,
     )
 

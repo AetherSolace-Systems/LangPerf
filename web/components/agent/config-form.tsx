@@ -41,6 +41,7 @@ export function ConfigForm({ agent }: { agent: AgentDetail }) {
         `${CLIENT_API_URL}/api/agents/${encodeURIComponent(agent.name)}`,
         {
           method: "PATCH",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(patch),
         },

@@ -74,7 +74,7 @@ def main() -> int:
 
     langperf.init(
         endpoint=os.environ.get("LANGPERF_ENDPOINT", "http://localhost:4318"),
-        service_name="code-helper",
+        agent_name="code-helper",
         environment=args.env,
     )
 

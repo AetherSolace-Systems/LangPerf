@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { headers } from "next/headers";
 import { NotificationsDrawer } from "@/components/collab/notifications-drawer";
 import { IconRail } from "@/components/shell/icon-rail";
 import { TopBar, type TopBarProps } from "@/components/shell/top-bar";
@@ -18,8 +17,7 @@ export type AppShellProps = {
 export async function AppShell({ topBar, contextSidebar, children }: AppShellProps) {
   let me = null;
   try {
-    const cookie = headers().get("cookie") ?? undefined;
-    me = await fetchMe(cookie);
+    me = await fetchMe();
   } catch {
     // fetchMe failure (e.g. API down) should not crash the shell
   }

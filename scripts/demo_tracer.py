@@ -13,7 +13,7 @@ Typical usage::
     import langperf
     from scripts.demo_tracer import fake_trajectory, fake_llm, fake_tool
 
-    langperf.init(service_name="demo")
+    langperf.init(agent_name="demo")
     with fake_trajectory("example"):
         fake_llm(system="...", user="...", response="...", duration_ms=200)
         fake_tool(name="search", args={"q": "x"}, result={"n": 3}, duration_ms=40)

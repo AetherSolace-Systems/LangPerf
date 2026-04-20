@@ -45,14 +45,9 @@ test.describe("Logs /logs", () => {
   });
 
   test("connection indicator shows 'streaming' or 'disconnected'", async ({ page }) => {
-    // Allow a moment for the SSE connection to establish or fail
-    await page.waitForTimeout(1500);
-    const streaming = page.getByText(/streaming/i);
-    const disconnected = page.getByText(/disconnected/i);
-    const eitherVisible =
-      (await streaming.isVisible().catch(() => false)) ||
-      (await disconnected.isVisible().catch(() => false));
-    expect(eitherVisible).toBe(true);
+    // Wait for the SSE connection to settle into either terminal state
+    const indicator = page.getByText(/streaming|disconnected/i).first();
+    await expect(indicator).toBeVisible({ timeout: 5000 });
   });
 
   test("console container (font-mono) is present", async ({ page }) => {
@@ -62,32 +57,30 @@ test.describe("Logs /logs", () => {
   });
 
   test("API traffic appears in the console within a few seconds", async ({ page }) => {
-    // Wait for SSE to settle
-    await page.waitForTimeout(3000);
+    // Wait for SSE to settle into a terminal state (streaming or disconnected)
+    await expect(page.getByText(/streaming|disconnected/i).first()).toBeVisible({ timeout: 5000 });
 
     // Generate some API traffic
     await page.request.get("http://localhost:4318/api/agents");
 
-    // Wait for the log event to flow through SSE
-    await page.waitForTimeout(2000);
-
     // Look for any log line mentioning GET or /api/ in the console
     const consoleLogs = page.locator("div.font-mono.text-\\[11px\\] span.flex-1");
-    const count = await consoleLogs.count();
 
     // If level filter is hiding the line, try switching to DEBUG for full visibility
-    if (count === 0) {
-      await page.getByRole("button", { name: "DEBUG" }).click();
-      await page.waitForTimeout(1000);
+    if ((await consoleLogs.count()) === 0) {
+      const debugBtn = page.getByRole("button", { name: "DEBUG" });
+      await debugBtn.click();
+      await expect(debugBtn).toHaveClass(/text-aether-teal/, { timeout: 5000 });
     }
 
-    // Check for at least one line mentioning an HTTP method or /api/
-    const allText = await page.locator("div.font-mono.text-\\[11px\\]").textContent();
-    const hasApiTraffic =
-      (allText ?? "").includes("/api/") ||
-      (allText ?? "").match(/GET|POST|PUT|DELETE/) !== null;
-
-    // The console may also show it already had history loaded
-    expect(hasApiTraffic || (await consoleLogs.count()) > 0).toBe(true);
+    // Poll for the forwarded log line to reach the console
+    await expect(async () => {
+      const allText = await page.locator("div.font-mono.text-\\[11px\\]").textContent();
+      const hasApiTraffic =
+        (allText ?? "").includes("/api/") ||
+        (allText ?? "").match(/GET|POST|PUT|DELETE/) !== null;
+      // The console may also already have history loaded
+      expect(hasApiTraffic || (await consoleLogs.count()) > 0).toBe(true);
+    }).toPass({ timeout: 5000 });
   });
 });

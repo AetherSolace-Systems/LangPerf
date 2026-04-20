@@ -1,17 +1,27 @@
 import type { Page } from "@playwright/test";
 
-const API_BASE = "http://localhost:4318";
+const API_BASE = process.env.LANGPERF_API_BASE ?? "http://localhost:4318";
 
 /**
  * Fetch an existing agent name from the backend so tests don't hard-code one.
- * Returns the first non-legacy agent when possible, else the first agent at all.
+ * Prefers an agent that actually has runs (so per-agent-runs views render a
+ * table), falling back to the first non-legacy agent, then the first agent.
  */
 export async function firstAgentName(page: Page): Promise<string> {
-  const resp = await page.request.get(`${API_BASE}/api/agents`);
-  const agents = (await resp.json()) as { name: string; signature?: string }[];
+  const [agentsResp, runsResp] = await Promise.all([
+    page.request.get(`${API_BASE}/api/agents`),
+    page.request.get(`${API_BASE}/api/runs?limit=50`),
+  ]);
+  const agents = (await agentsResp.json()) as { name: string; signature?: string }[];
   if (agents.length === 0) {
     throw new Error("no agents on the server — seed data is missing");
   }
+  const runs = (await runsResp.json()) as { items: { agent_name: string | null }[] };
+  const namesWithRuns = new Set(
+    (runs.items ?? []).map((r) => r.agent_name).filter(Boolean) as string[],
+  );
+  const withRuns = agents.find((a) => namesWithRuns.has(a.name));
+  if (withRuns) return withRuns.name;
   const real = agents.find((a) => a.signature && !a.signature.startsWith("legacy:"));
   return (real ?? agents[0]).name;
 }

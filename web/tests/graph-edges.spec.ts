@@ -43,8 +43,13 @@ test("clicking an edge label toggles JSON peek", async ({ page }) => {
     return;
   }
 
-  await payloadLabel.click();
+  // Use synthetic click via evaluate() instead of .click(). React Flow's
+  // EdgeLabelRenderer portals the label at viewport coordinates that can
+  // fall under the AppShell's left ContextSidebar depending on the graph
+  // layout. We're testing the onClick handler's toggle logic, not browser
+  // hit-testing; evaluate() invokes the handler directly.
+  await payloadLabel.evaluate((el) => (el as HTMLElement).click());
   await expect(payloadLabel).toHaveAttribute("data-expanded", "true");
-  await payloadLabel.click();
+  await payloadLabel.evaluate((el) => (el as HTMLElement).click());
   await expect(payloadLabel).toHaveAttribute("data-expanded", "false");
 });

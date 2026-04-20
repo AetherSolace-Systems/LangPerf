@@ -1,6 +1,8 @@
 // Server-side API client for talking to langperf-api across the docker network.
 // Client-side code should use `NEXT_PUBLIC_LANGPERF_API_URL` (exposed via env).
 
+import { apiFetch } from "./fetch-utils";
+
 export const SERVER_API_URL =
   process.env.LANGPERF_API_URL ?? "http://localhost:4318";
 
@@ -83,28 +85,10 @@ function buildQuery(filters: ListFilters): string {
   return s ? `?${s}` : "";
 }
 
-async function apiFetch<T>(path: string): Promise<T> {
-  const base = apiBase();
-  const url = `${base}${path}`;
-  // On the server, forward the incoming session cookie so authenticated
-  // calls don't 401. `next/headers` is dynamic import because this module
-  // is also pulled into client bundles where the import doesn't resolve.
-  let cookie = "";
-  if (typeof window === "undefined") {
-    try {
-      const { headers } = await import("next/headers");
-      cookie = headers().get("cookie") ?? "";
-    } catch {
-      // Outside a request context (e.g. build-time); no cookie available.
-    }
-  }
-  const init: RequestInit = { cache: "no-store" };
-  if (cookie) init.headers = { cookie };
-  else if (typeof window !== "undefined") init.credentials = "include";
-  const resp = await fetch(url, init);
-  if (!resp.ok) throw new Error(`langperf-api ${resp.status} at ${url}`);
-  return resp.json();
-}
+// apiFetch now lives in ./fetch-utils and is shared across every domain
+// module. Re-exported here so existing callers (and the in-file helpers
+// below) continue to resolve it from "@/lib/api".
+export { apiFetch };
 
 export async function listTrajectories(
   filters: ListFilters = {},

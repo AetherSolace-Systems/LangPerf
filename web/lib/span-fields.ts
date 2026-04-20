@@ -136,6 +136,16 @@ function numOrNull(v: unknown): number | null {
   return null;
 }
 
+export function toolName(span: Span): string | null {
+  const t = extractToolFields(span.attributes);
+  return t.tool_name ?? null;
+}
+
+export function toolOutput(span: Span): unknown {
+  const t = extractToolFields(span.attributes);
+  return t.output ?? null;
+}
+
 function readIndexedMessages(attrs: Attrs, prefix: string): LlmMessage[] {
   // OpenInference flattens messages into:
   //   <prefix>.<i>.message.role

@@ -47,10 +47,10 @@ export function LiveConsole({
   // Initial history fetch
   useEffect(() => {
     let cancelled = false;
-    fetch(`${CLIENT_API_URL}/api/logs/recent?limit=300`)
-      .then((r) => r.json())
-      .then((rows: LogEvent[]) => {
-        if (!cancelled) setEvents(rows);
+    fetch(`${CLIENT_API_URL}/api/logs/recent?limit=300`, { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows) => {
+        if (!cancelled && Array.isArray(rows)) setEvents(rows);
       })
       .catch(() => {});
     return () => {
@@ -60,7 +60,7 @@ export function LiveConsole({
 
   // Live stream
   useEffect(() => {
-    const es = new EventSource(`${CLIENT_API_URL}/api/logs/stream`);
+    const es = new EventSource(`${CLIENT_API_URL}/api/logs/stream`, { withCredentials: true });
     es.onopen = () => setConnected(true);
     es.onerror = () => setConnected(false);
     es.onmessage = (e) => {

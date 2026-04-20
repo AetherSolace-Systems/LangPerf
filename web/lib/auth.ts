@@ -1,4 +1,5 @@
 import { CLIENT_API_URL, SERVER_API_URL } from "./api";
+import { ApiError, apiFetch } from "./fetch-utils";
 
 export type AuthMode = "single_user" | "multi_user";
 
@@ -16,15 +17,16 @@ export async function fetchMode(): Promise<AuthMode> {
   return body.mode as AuthMode;
 }
 
-export async function fetchMe(cookie?: string): Promise<CurrentUser | null> {
-  const res = await fetch(`${SERVER_API_URL}/api/auth/me`, {
-    headers: cookie ? { cookie } : {},
-    cache: "no-store",
-  });
-  if (res.status === 401) return null;
-  if (!res.ok) throw new Error(`me failed: ${res.status}`);
-  const body = await res.json();
-  return body.user;
+export async function fetchMe(): Promise<CurrentUser | null> {
+  try {
+    const body = await apiFetch<{ user: CurrentUser | null }>(`/api/auth/me`);
+    return body.user;
+  } catch (err) {
+    // 401 is the expected "not signed in" signal — surface as null so the
+    // login flow can react. Any other error is real and should bubble up.
+    if (err instanceof ApiError && err.status === 401) return null;
+    throw err;
+  }
 }
 
 export async function loginRequest(email: string, password: string): Promise<CurrentUser> {
@@ -64,12 +66,6 @@ export async function logoutRequest(): Promise<void> {
   });
 }
 
-export async function listMembers(cookie?: string): Promise<{ id: string; display_name: string }[]> {
-  const base = cookie ? SERVER_API_URL : CLIENT_API_URL;
-  const res = await fetch(`${base}/api/auth/org/members`,
-    cookie
-      ? { headers: { cookie }, cache: "no-store" }
-      : { credentials: "include", cache: "no-store" },
-  );
-  return res.json();
+export async function listMembers(): Promise<{ id: string; display_name: string }[]> {
+  return apiFetch<{ id: string; display_name: string }[]>(`/api/auth/org/members`);
 }

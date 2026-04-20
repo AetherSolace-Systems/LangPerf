@@ -6,7 +6,15 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+# The app's own engine is loaded at import time (see app.db). Default to an
+# in-memory sqlite so `from app.main import app` works without any external DB.
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+
+# Tests use a separate TEST_DATABASE_URL so CI can run the same suite against
+# Postgres (which has percentile_cont / date_trunc and real FK enforcement)
+# without touching the app's default engine config.
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+USING_POSTGRES = TEST_DATABASE_URL.startswith("postgres")
 
 from app import db as db_module  # noqa: E402
 from app.main import app  # noqa: E402
@@ -15,8 +23,11 @@ from app.models import Base  # noqa: E402
 
 @pytest_asyncio.fixture
 async def engine():
-    eng = create_async_engine("sqlite+aiosqlite:///:memory:", future=True)
+    eng = create_async_engine(TEST_DATABASE_URL, future=True)
     async with eng.begin() as conn:
+        if USING_POSTGRES:
+            # Postgres test lane reuses one DB across runs; wipe tables first.
+            await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     yield eng
     await eng.dispose()

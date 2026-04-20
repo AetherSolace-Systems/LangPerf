@@ -42,6 +42,7 @@ services:
       - ./web/components:/app/components
       - ./web/lib:/app/lib
       - ./web/public:/app/public
+      - ./web/middleware.ts:/app/middleware.ts
     depends_on:
       - langperf-api
     command: npm run dev

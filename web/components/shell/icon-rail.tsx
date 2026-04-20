@@ -46,7 +46,10 @@ export function IconRail() {
   const footer = RAIL_ITEMS.filter((i) => i.group === "footer");
 
   return (
-    <nav className="w-[56px] border-r border-[color:var(--border)] bg-[color:var(--surface-2)] flex flex-col py-[8px] gap-[2px]">
+    <nav
+      data-testid="rail-nav"
+      className="w-[56px] border-r border-[color:var(--border)] bg-[color:var(--surface-2)] flex flex-col py-[8px] gap-[2px]"
+    >
       {primary.map((i) => (
         <RailCell key={i.id} item={i} active={isActive(pathname, i)} />
       ))}

@@ -27,7 +27,7 @@ import openai
 def main() -> int:
     langperf.init(
         endpoint=os.environ.get("LANGPERF_ENDPOINT", "http://localhost:4318"),
-        service_name="langperf-smoke",
+        agent_name="langperf-smoke",
         environment="dev",
     )
 
