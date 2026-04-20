@@ -23,14 +23,18 @@ function MessageCard({ message }: { message: LlmMessage }) {
         // Thinking / reasoning surfaces for OpenAI o-series, Anthropic
         // extended thinking, and Gemini. The flat
         // `llm.input_messages.<i>.message.content` attr is empty when
-        // the model reasons then emits only tool_calls; this row is
-        // often the only place the thinking shows up.
+        // the model reasons then emits only tool_calls; this block is
+        // often the only place the thinking shows up. Violet signals
+        // "reasoning channel" distinct from the role-colored body.
         <div
-          className="px-3 py-2 border-b text-sm text-warm-fog/70 italic whitespace-pre-wrap break-words"
-          style={{ borderColor: swatch.border, background: "rgba(0,0,0,0.18)" }}
+          className="px-3 py-2 border-b text-sm italic whitespace-pre-wrap break-words text-aether-violet/85"
+          style={{
+            borderColor: swatch.border,
+            background: "rgba(167,139,250,0.06)",
+          }}
         >
           <span
-            className="text-[9px] uppercase tracking-wider not-italic font-mono mr-2 text-patina"
+            className="text-[9px] uppercase tracking-wider not-italic font-mono mr-2 text-aether-violet"
             style={{ letterSpacing: "0.08em" }}
           >
             [think]
