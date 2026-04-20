@@ -66,20 +66,48 @@ function MsgLine({ message }: { message: LlmMessage }) {
   const content = message.content ?? "";
   const truncated =
     content.length > MSG_MAX ? content.slice(0, MSG_MAX) + "…" : content;
+  const reasoning = message.reasoning?.trim();
+  const reasoningTrunc =
+    reasoning && reasoning.length > MSG_MAX
+      ? reasoning.slice(0, MSG_MAX) + "…"
+      : reasoning ?? null;
+
   return (
-    <div className="flex items-start gap-1.5 leading-relaxed">
-      <span
-        className="text-[9px] uppercase tracking-wider font-mono flex-shrink-0 px-1 rounded"
-        style={{ color: sw.fg, border: `1px solid ${sw.border}` }}
-      >
-        {roleLabel(message.role)}
-      </span>
-      <span className="flex-1 text-warm-fog truncate">{truncated}</span>
-      {message.tool_calls?.length ? (
-        <span className="text-peach-neon flex-shrink-0 font-mono">
-          → {message.tool_calls.map((tc) => tc.name).join(", ")}
-        </span>
+    <div className="space-y-1">
+      {reasoningTrunc ? (
+        // [THINK] row — surfaces reasoning_content so the user can see
+        // WHY the model reached for this tool, not just which tool it
+        // picked. Rendered above the assistant line on purpose (the
+        // model thinks first, then speaks / calls a tool).
+        <div className="flex items-start gap-1.5 leading-relaxed">
+          <span
+            className="text-[9px] uppercase tracking-wider font-mono flex-shrink-0 px-1 rounded"
+            style={{
+              color: "var(--patina)",
+              border: "1px dashed var(--border)",
+            }}
+          >
+            think
+          </span>
+          <span className="flex-1 text-warm-fog/70 italic whitespace-pre-wrap">
+            {reasoningTrunc}
+          </span>
+        </div>
       ) : null}
+      <div className="flex items-start gap-1.5 leading-relaxed">
+        <span
+          className="text-[9px] uppercase tracking-wider font-mono flex-shrink-0 px-1 rounded"
+          style={{ color: sw.fg, border: `1px solid ${sw.border}` }}
+        >
+          {roleLabel(message.role)}
+        </span>
+        <span className="flex-1 text-warm-fog truncate">{truncated}</span>
+        {message.tool_calls?.length ? (
+          <span className="text-peach-neon flex-shrink-0 font-mono">
+            → {message.tool_calls.map((tc) => tc.name).join(", ")}
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }
