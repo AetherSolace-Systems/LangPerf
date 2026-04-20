@@ -65,6 +65,27 @@ def init(
         logger.debug("langperf.init() called more than once; ignoring subsequent call")
         return _state["provider"]
 
+    # OTel only allows one global TracerProvider per process. If another
+    # library (opentelemetry-instrument, LangSmith, LangGraph, Sentry,
+    # OTEL_* env vars) already set one, our set_tracer_provider() below
+    # is silently ignored — their exporter then ships spans without our
+    # bearer header and ingest returns 401 for every export. Warn loud
+    # so dogfooders don't debug in the dark.
+    existing = trace_api.get_tracer_provider()
+    # Fresh OTel default is a ProxyTracerProvider; anything else means
+    # someone's already here.
+    if existing.__class__.__name__ not in ("ProxyTracerProvider", "NoOpTracerProvider"):
+        logger.warning(
+            "langperf.init(): another TracerProvider is already registered "
+            "(%s). OTel only allows one global provider; langperf's "
+            "exporter will not receive spans. Common causes: launching via "
+            "`opentelemetry-instrument`, OTEL_* env vars, or a framework "
+            "(LangSmith, LangGraph, Sentry) that auto-installs its own. "
+            "Either remove the competing setup, or call langperf.init() "
+            "BEFORE the other library initializes.",
+            existing.__class__.__name__,
+        )
+
     # Deprecation shim for service_name -> agent_name
     if service_name is not None and agent_name is None:
         logger.warning(
