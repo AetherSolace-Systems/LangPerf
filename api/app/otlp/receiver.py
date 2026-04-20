@@ -41,9 +41,26 @@ async def receive_traces(
 ):
     token = _extract_bearer(authorization)
     if token is None:
+        # Log the header shape (not contents) so dogfood 401s don't feel
+        # opaque. Common causes: header stripped by a reverse proxy, SDK
+        # using the wrong env var, `Authorization` vs `authorization`.
+        logger.warning(
+            "OTLP 401: no bearer token. authorization header %s",
+            "present but malformed" if authorization else "absent",
+        )
         raise HTTPException(status_code=401, detail="bearer token required")
     agent = await _resolve_agent_by_token(session, token)
     if agent is None:
+        # Surface the presented prefix — NOT the full token — so callers
+        # can cross-check against the Agent row in the UI without us
+        # leaking the secret half. Differentiates "typo / wrong agent
+        # copied" from "token rotated but env not updated".
+        prefix = token[:TOKEN_PREFIX_LEN]
+        logger.warning(
+            "OTLP 401: no agent for token prefix %r (length=%d)",
+            prefix,
+            len(token),
+        )
         raise HTTPException(status_code=401, detail="invalid token")
 
     body = await request.body()
