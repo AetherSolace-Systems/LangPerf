@@ -104,7 +104,7 @@ resource.
 
 | Key | Type | Written by |
 | --- | --- | --- |
-| `service.name` | string | `init(agent_name=)` |
+| `service.name` | string | `init(agent_name=)` — advisory / OTel interop only; the Agent bound to the bearer token is authoritative for display |
 | `service.version` | string | `init(version=)` |
 | `deployment.environment` | string | `init(environment=)` |
 | `langperf.agent.signature` | hex string | auto (signature of caller) |

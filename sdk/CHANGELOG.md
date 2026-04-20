@@ -3,6 +3,21 @@
 All notable changes to the `langperf` SDK. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Semver: [SemVer 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] — 2026-04-20
+
+### Changed
+- `agent_name=` / `LANGPERF_AGENT_NAME` is now explicitly advisory.
+  The bearer token alone identifies the Agent; the backend uses the
+  Agent's registered name for `trajectory.service_name` regardless of
+  what the SDK sends. Callers no longer need to keep the SDK name in
+  sync with the UI. Docs updated to drop `agent_name=` from the
+  recommended `init()` call.
+
+### Fixed
+- Backend ingest now overwrites `Trajectory.service_name` with the
+  token-authorized `Agent.name` if the user renames the agent in the
+  UI after initial ingest.
+
 ## [0.2.0] — 2026-04-20
 
 ### Added

@@ -30,13 +30,16 @@ pip install langperf   # coming soon; today: pip install -e ./sdk
    ```python
    import langperf
 
-   langperf.init(
-       agent_name="weather-bot",
-       environment="prod",
-       version="1.2.3",
-       # api_token= and endpoint= default to env vars
-   )
+   langperf.init()  # reads LANGPERF_API_TOKEN from env
+   # or, optionally, with environment / version hints:
+   langperf.init(environment="prod", version="1.2.3")
    ```
+
+The **token alone identifies the agent** — you don't pass an agent
+name, and there's nothing to keep in sync with the UI. `agent_name=` is
+accepted as an advisory OTel `service.name` hint for interop with other
+OTel tooling; the backend uses the Agent's registered name for display
+regardless of what you send.
 
 Everything flowing through the OpenAI Python SDK is captured automatically
 after `init()` — messages, tool calls, token counts, timing, model name.
@@ -68,7 +71,7 @@ All public names are re-exported from the top-level `langperf` package.
 ```python
 import langperf, openai
 
-langperf.init(agent_name="weather-bot", environment="prod")
+langperf.init(environment="prod")
 client = openai.OpenAI()
 
 with langperf.trajectory("forecast query"):
@@ -208,9 +211,9 @@ accordingly.
 
 | Var | Effect | Default |
 | --- | --- | --- |
-| `LANGPERF_API_TOKEN` | **Required.** Per-agent bearer token minted in the UI. | — |
+| `LANGPERF_API_TOKEN` | **Required.** Per-agent bearer token minted in the UI. Identifies the Agent on its own. | — |
 | `LANGPERF_ENDPOINT` | OTLP endpoint base URL. | `http://localhost:4318` |
-| `LANGPERF_AGENT_NAME` | Agent name (falls back to `agent_name=` kwarg). | `langperf-agent` |
+| `LANGPERF_AGENT_NAME` | Advisory OTel `service.name` hint. Backend uses the registered Agent name for display regardless. | `langperf-agent` |
 | `LANGPERF_ENVIRONMENT` | Maps to OTel `deployment.environment`. | unset |
 | `LANGPERF_VERSION` | Sets `service.version`. | unset |
 | `LANGPERF_SERVICE_NAME` | *(deprecated)* alias for `LANGPERF_AGENT_NAME`. | unset |
@@ -226,7 +229,7 @@ local server; nothing else changes:
 
 ```python
 import openai, langperf
-langperf.init(agent_name="local-bot")
+langperf.init()
 client = openai.OpenAI(base_url="http://localhost:1234/v1", api_key="lm-studio")
 client.chat.completions.create(model="gpt-oss-20b", messages=[...])
 ```

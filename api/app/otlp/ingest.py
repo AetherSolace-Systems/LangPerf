@@ -151,7 +151,15 @@ async def _upsert_trajectory_for_span(
     org_id: str,
     agent: Agent,
 ) -> None:
-    service_name = resolve_service_name(resource_attrs)
+    # The token-authorized Agent is authoritative for identity *and*
+    # display. Previously we trusted the SDK-supplied `service.name`
+    # resource attr, which forced callers to keep `agent_name=` in sync
+    # with the Agent row in the UI — a footgun with no upside, since the
+    # token already told us who this is. Prefer `agent.name`; fall back
+    # to the resource attr only for OTel interop paths where no Agent
+    # was resolved (should be unreachable today but keeps the shape
+    # tolerant).
+    service_name = agent.name if agent is not None else resolve_service_name(resource_attrs)
     environment = resolve_environment(resource_attrs)
     name = resolve_trajectory_name(span, resource_attrs)
     agent_id, agent_version_id = await resolve_agent_and_version(
@@ -200,6 +208,11 @@ async def _upsert_trajectory_for_span(
             changed = True
         if environment and not existing.environment:
             existing.environment = environment
+            changed = True
+        # service_name is canonical from the Agent row; keep it in sync
+        # if the user renames the agent in the UI between ingests.
+        if agent is not None and existing.service_name != agent.name:
+            existing.service_name = agent.name
             changed = True
         if agent_id and not existing.agent_id:
             existing.agent_id = agent_id
