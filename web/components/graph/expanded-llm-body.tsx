@@ -77,19 +77,19 @@ function MsgLine({ message }: { message: LlmMessage }) {
       {reasoningTrunc ? (
         // [THINK] row — surfaces reasoning_content so the user can see
         // WHY the model reached for this tool, not just which tool it
-        // picked. Rendered above the assistant line on purpose (the
-        // model thinks first, then speaks / calls a tool).
+        // picked. Violet ("aether-violet") to signal reasoning as a
+        // distinct channel from the teal assistant / peach tool pair.
         <div className="flex items-start gap-1.5 leading-relaxed">
           <span
-            className="text-[9px] uppercase tracking-wider font-mono flex-shrink-0 px-1 rounded"
+            className="text-[9px] uppercase tracking-wider font-mono flex-shrink-0 px-1 rounded text-aether-violet"
             style={{
-              color: "var(--patina)",
-              border: "1px dashed var(--border)",
+              border: "1px dashed rgba(167,139,250,0.45)",
+              background: "rgba(167,139,250,0.06)",
             }}
           >
             think
           </span>
-          <span className="flex-1 text-warm-fog/70 italic whitespace-pre-wrap">
+          <span className="flex-1 text-aether-violet/80 italic whitespace-pre-wrap">
             {reasoningTrunc}
           </span>
         </div>
