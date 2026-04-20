@@ -19,7 +19,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install ruff
+      # Pin ruff to match the pyproject.toml declaration (>=0.6,<0.7).
+      # Ruff ships new default lints in minor releases; an unpinned install
+      # on CI drifts away from developer machines and surprises PRs with
+      # "CI red / local green" failures.
+      - run: pip install 'ruff>=0.6,<0.7'
       - run: ruff check api/
       - run: ruff check sdk/
 
