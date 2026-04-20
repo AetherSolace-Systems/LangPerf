@@ -34,11 +34,24 @@ DEFAULT_FAILURE_MODES: list[tuple[str, str, str]] = [
 ]
 
 # ── Span-attribute keys the LangPerf SDK stamps ──────────────────────────
-# Kept in sync with sdk/langperf/_baggage.py (ATTR_TRAJECTORY_*).
+# Kept in sync with sdk/langperf/attributes.py. Wire protocol — change
+# either file and mirror the change on the other side.
 ATTR_TRAJECTORY_ID = "langperf.trajectory.id"
 ATTR_TRAJECTORY_NAME = "langperf.trajectory.name"
 ATTR_NODE_KIND = "langperf.node.kind"
 ATTR_NODE_NAME = "langperf.node.name"
+
+# Bridge: SDK mark() populates these on the trajectory-kind root span; the
+# OTLP ingest layer copies them onto the Trajectory row so UI filters
+# reflect SDK-side marks.
+ATTR_STATUS_TAG = "langperf.status_tag"
+ATTR_NOTES = "langperf.notes"
+
+# User attribution — informational; not yet first-class on the trajectory row.
+ATTR_USER_ID = "langperf.user.id"
+ATTR_USER_EMAIL = "langperf.user.email"
+ATTR_USER_DISPLAY_NAME = "langperf.user.display_name"
+ATTR_SESSION_ID = "langperf.session.id"
 
 # ── OTel resource-attribute keys ─────────────────────────────────────────
 ATTR_SERVICE_NAME = "service.name"

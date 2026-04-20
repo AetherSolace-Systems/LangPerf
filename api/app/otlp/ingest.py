@@ -26,6 +26,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import ALLOWED_TAGS, ATTR_NODE_KIND, ATTR_NOTES, ATTR_STATUS_TAG
 from app.models import Agent, Span, Trajectory
 from app.otlp.agent_resolver import resolve_agent_and_version
 from app.otlp.attrs import (
@@ -180,11 +181,17 @@ async def _upsert_trajectory_for_span(
     existing = await session.get(Trajectory, traj_id)
     if existing:
         changed = False
-        if span_started_at < existing.started_at:
+        # sqlite's DATETIME type strips tzinfo on INSERT/SELECT round-trips.
+        # Normalize `existing` values back to aware-UTC so the tz-aware
+        # `span_started_at` / `span_ended_at` can be compared without
+        # TypeError. Postgres stores tz correctly and these are no-ops.
+        existing_started = _to_utc(existing.started_at)
+        existing_ended = _to_utc(existing.ended_at)
+        if span_started_at < existing_started:
             existing.started_at = span_started_at
             changed = True
         if span_ended_at and (
-            existing.ended_at is None or span_ended_at > existing.ended_at
+            existing_ended is None or span_ended_at > existing_ended
         ):
             existing.ended_at = span_ended_at
             changed = True
@@ -200,8 +207,39 @@ async def _upsert_trajectory_for_span(
         if agent_version_id and not existing.agent_version_id:
             existing.agent_version_id = agent_version_id
             changed = True
+        if _apply_sdk_signals(existing, span):
+            changed = True
         if changed:
             session.add(existing)
+
+
+def _apply_sdk_signals(trajectory: Trajectory, span: DecodedSpan) -> bool:
+    """Copy SDK-side `mark()` signals off the trajectory-root span into
+    the Trajectory row so UI filters reflect them.
+
+    We only read signals off the root span (the one stamped with
+    ``langperf.node.kind = "trajectory"`` by the SDK). Other spans
+    shouldn't carry these attrs but we'd ignore them if they did — keeps
+    intent local to where users actually write the signal.
+
+    Returns True iff any column on `trajectory` changed.
+    """
+    attrs = span.get("attributes") or {}
+    if attrs.get(ATTR_NODE_KIND) != "trajectory":
+        return False
+
+    changed = False
+    tag = attrs.get(ATTR_STATUS_TAG)
+    if isinstance(tag, str) and tag in ALLOWED_TAGS and trajectory.status_tag != tag:
+        trajectory.status_tag = tag
+        changed = True
+
+    notes = attrs.get(ATTR_NOTES)
+    if isinstance(notes, str) and notes and trajectory.notes != notes:
+        trajectory.notes = notes
+        changed = True
+
+    return changed
 
 
 async def _recompute_single(session: AsyncSession, traj_id: str) -> None:
@@ -243,6 +281,21 @@ async def _recompute_single(session: AsyncSession, traj_id: str) -> None:
 
 def _unix_nano_to_dt(unix_nano: int) -> datetime:
     return datetime.fromtimestamp(unix_nano / 1_000_000_000, tz=timezone.utc)
+
+
+def _to_utc(dt: datetime | None) -> datetime | None:
+    """Coerce a (possibly naive) datetime to aware-UTC.
+
+    Sqlite's DATETIME type strips tzinfo. Postgres preserves it. The
+    ingest comparisons below need both sides to be aware-or-both-naive,
+    so normalize on read and treat naive values as already-UTC (which
+    they are, since the SDK only ever writes UTC).
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
 
 
 _MAX_PROMPT_LEN = 16_384
