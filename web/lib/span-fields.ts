@@ -20,6 +20,14 @@ export type Role = "system" | "user" | "assistant" | "tool" | "developer" | stri
 export type LlmMessage = {
   role: Role;
   content: string | null;
+  /**
+   * Model reasoning / "thinking" text. OpenAI reasoning models, Claude's
+   * extended thinking, and Gemini all emit this alongside the visible
+   * `content`. OpenInference doesn't flatten it into the indexed attr
+   * namespace, so we extract it from the raw `output.value` / `input.value`
+   * JSON and merge it back on.
+   */
+  reasoning?: string | null;
   tool_calls?: Array<{
     name: string;
     arguments: string | Record<string, unknown>;
@@ -53,13 +61,25 @@ export type ToolSpanFields = {
 export function kindOf(span: Span): string {
   const attrs = span.attributes;
   const explicit = (attrs["langperf.node.kind"] as string | undefined) ?? null;
-  if (explicit) return explicit.toLowerCase();
+  if (explicit) return normalizeKind(explicit);
   const oi = (attrs["openinference.span.kind"] as string | undefined) ?? null;
-  if (oi) return oi.toLowerCase();
-  if (span.kind) return span.kind.toLowerCase();
+  if (oi) return normalizeKind(oi);
+  if (span.kind) return normalizeKind(span.kind);
   if ("gen_ai.operation.name" in attrs || "llm.system" in attrs) return "llm";
-  if ("tool.name" in attrs) return "tool";
+  if ("tool.name" in attrs || "langperf.tool.name" in attrs) return "tool";
   return "generic";
+}
+
+/**
+ * Collapse the varying "tool"-ish kind spellings to a single canonical
+ * value. SDK users who wrap with `langperf.node(kind="tool_call")` emit
+ * "tool_call"; OpenInference emits "TOOL"; some frameworks emit "tool".
+ * The UI only cares that it's a tool span.
+ */
+function normalizeKind(raw: string): string {
+  const k = raw.toLowerCase();
+  if (k === "tool_call" || k === "toolcall") return "tool";
+  return k;
 }
 
 /**
@@ -99,6 +119,16 @@ export function extractLlmFields(attrs: Attrs): LlmSpanFields {
   const input_messages = readIndexedMessages(attrs, "llm.input_messages");
   const output_messages = readIndexedMessages(attrs, "llm.output_messages");
 
+  const input_raw = safeJsonParse(attrs["input.value"]);
+  const output_raw = safeJsonParse(attrs["output.value"]);
+
+  // OpenInference flattens role / content / tool_calls but drops
+  // `reasoning_content` (OpenAI o-series, Anthropic thinking, Gemini
+  // reasoning). Mine it from the raw request/response JSON and merge
+  // onto the flat messages, matched by position.
+  mergeReasoningFromRaw(input_messages, input_raw, "messages");
+  mergeReasoningFromRaw(output_messages, output_raw, "choices");
+
   const tokens = {
     prompt: numOrNull(attrs["llm.token_count.prompt"] ?? attrs["gen_ai.usage.input_tokens"]),
     completion: numOrNull(attrs["llm.token_count.completion"] ?? attrs["gen_ai.usage.output_tokens"]),
@@ -112,18 +142,61 @@ export function extractLlmFields(attrs: Attrs): LlmSpanFields {
     input_messages,
     output_messages,
     tokens,
-    input_raw: safeJsonParse(attrs["input.value"]),
-    output_raw: safeJsonParse(attrs["output.value"]),
+    input_raw,
+    output_raw,
   };
 }
 
+/**
+ * Fill in `reasoning` on each LlmMessage by looking in the raw JSON.
+ * Inputs come in under `{messages: [...]}`; outputs come in under
+ * `{choices: [{message: {...}}, ...]}`. We match by position — fragile
+ * if indices drift, but OpenInference and the SDK both preserve order.
+ */
+function mergeReasoningFromRaw(
+  messages: LlmMessage[],
+  raw: unknown,
+  rawKey: "messages" | "choices",
+): void {
+  if (!raw || typeof raw !== "object") return;
+  const bucket = (raw as Record<string, unknown>)[rawKey];
+  if (!Array.isArray(bucket)) return;
+  bucket.forEach((entry, i) => {
+    if (i >= messages.length) return;
+    // For outputs, each entry is `{message: {...}}`; for inputs, the
+    // message IS the entry.
+    const msg =
+      rawKey === "choices" && entry && typeof entry === "object"
+        ? ((entry as Record<string, unknown>).message as unknown)
+        : entry;
+    if (!msg || typeof msg !== "object") return;
+    const r = (msg as Record<string, unknown>).reasoning_content;
+    if (typeof r === "string" && r.trim()) {
+      messages[i].reasoning = r;
+    }
+  });
+}
+
 export function extractToolFields(attrs: Attrs): ToolSpanFields {
+  // Prefer OpenInference's conventional keys, then fall back to the
+  // langperf.* keys emitted by `@langperf.tool`. Users wrapping tools
+  // with `langperf.node(kind="tool_call")` as a plain context manager
+  // don't emit either — the final fallback is the attrs bag.
+  const input =
+    safeJsonParse(attrs["input.value"]) ??
+    safeJsonParse(attrs["langperf.tool.args"]);
+  const output =
+    safeJsonParse(attrs["output.value"]) ??
+    safeJsonParse(attrs["langperf.tool.result"]);
   return {
-    tool_name: (attrs["tool.name"] as string) ?? null,
+    tool_name:
+      (attrs["tool.name"] as string) ??
+      (attrs["langperf.tool.name"] as string) ??
+      null,
     tool_description: (attrs["tool.description"] as string) ?? null,
     parameters: safeJsonParse(attrs["tool.parameters"]),
-    input: safeJsonParse(attrs["input.value"]),
-    output: safeJsonParse(attrs["output.value"]),
+    input,
+    output,
   };
 }
 

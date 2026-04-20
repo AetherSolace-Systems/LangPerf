@@ -57,6 +57,20 @@ describe("kindOf", () => {
     });
     expect(kindOf(s)).toBe("reasoning");
   });
+
+  it("normalizes 'tool_call' and 'toolCall' to 'tool'", () => {
+    const a = makeSpan({
+      attributes: { "langperf.node.kind": "tool_call" },
+    });
+    expect(kindOf(a)).toBe("tool");
+    const b = makeSpan({ attributes: { "openinference.span.kind": "TOOL" } });
+    expect(kindOf(b)).toBe("tool");
+  });
+
+  it("infers 'tool' from langperf.tool.name when no kind is set", () => {
+    const s = makeSpan({ attributes: { "langperf.tool.name": "bash" } });
+    expect(kindOf(s)).toBe("tool");
+  });
 });
 
 describe("extractLlmFields", () => {
@@ -85,6 +99,61 @@ describe("extractLlmFields", () => {
     expect(out.tokens.prompt).toBe(100);
     expect(out.tokens.completion).toBe(50);
     expect(out.tokens.total).toBe(150);
+  });
+
+  it("extracts reasoning_content from output.value into output_messages", () => {
+    // OpenInference doesn't flatten reasoning_content — it only lives in
+    // the raw output.value JSON. This is the path that surfaces "thinking"
+    // for OpenAI o-series, Anthropic extended-thinking, and Gemini.
+    const attrs = {
+      "llm.output_messages.0.message.role": "assistant",
+      "llm.output_messages.0.message.content": "",
+      "output.value": JSON.stringify({
+        choices: [
+          {
+            message: {
+              role: "assistant",
+              content: "",
+              reasoning_content: "Let me think about this step by step...",
+            },
+          },
+        ],
+      }),
+    };
+    const out = extractLlmFields(attrs);
+    expect(out.output_messages[0].reasoning).toBe(
+      "Let me think about this step by step...",
+    );
+  });
+
+  it("extracts reasoning_content from historical assistant input messages", () => {
+    const attrs = {
+      "llm.input_messages.0.message.role": "assistant",
+      "llm.input_messages.0.message.content": "",
+      "input.value": JSON.stringify({
+        messages: [
+          {
+            role: "assistant",
+            content: "",
+            reasoning_content: "Earlier thinking step",
+          },
+        ],
+      }),
+    };
+    const out = extractLlmFields(attrs);
+    expect(out.input_messages[0].reasoning).toBe("Earlier thinking step");
+  });
+
+  it("leaves reasoning undefined when no reasoning_content is present", () => {
+    const attrs = {
+      "llm.output_messages.0.message.role": "assistant",
+      "llm.output_messages.0.message.content": "done",
+      "output.value": JSON.stringify({
+        choices: [{ message: { role: "assistant", content: "done" } }],
+      }),
+    };
+    const out = extractLlmFields(attrs);
+    expect(out.output_messages[0].reasoning).toBeUndefined();
   });
 
   it("prefers OpenInference token count attributes over gen_ai", () => {
@@ -138,5 +207,25 @@ describe("extractToolFields + toolName/toolOutput", () => {
   it("toolOutput(span) returns null when no output.value is present", () => {
     const s = makeSpan({ attributes: {} });
     expect(toolOutput(s)).toBeNull();
+  });
+
+  it("extractToolFields falls back to langperf.tool.args / result", () => {
+    // @langperf.tool emits these instead of the OpenInference keys.
+    const f = extractToolFields({
+      "langperf.tool.name": "bash",
+      "langperf.tool.args": '{"command":"ls"}',
+      "langperf.tool.result": '"one\\ntwo"',
+    });
+    expect(f.tool_name).toBe("bash");
+    expect(f.input).toEqual({ command: "ls" });
+    expect(f.output).toBe("one\ntwo");
+  });
+
+  it("extractToolFields prefers input.value over langperf.tool.args", () => {
+    const f = extractToolFields({
+      "input.value": '{"from":"oi"}',
+      "langperf.tool.args": '{"from":"lp"}',
+    });
+    expect(f.input).toEqual({ from: "oi" });
   });
 });

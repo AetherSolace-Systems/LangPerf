@@ -7,6 +7,7 @@ import { extractLlmFields, type LlmMessage } from "@/lib/span-fields";
 
 function MessageCard({ message }: { message: LlmMessage }) {
   const swatch = roleSwatch(message.role);
+  const reasoning = message.reasoning?.trim();
   return (
     <div
       className="border rounded-md"
@@ -18,6 +19,25 @@ function MessageCard({ message }: { message: LlmMessage }) {
       >
         {message.role}
       </div>
+      {reasoning ? (
+        // Thinking / reasoning surfaces for OpenAI o-series, Anthropic
+        // extended thinking, and Gemini. The flat
+        // `llm.input_messages.<i>.message.content` attr is empty when
+        // the model reasons then emits only tool_calls; this row is
+        // often the only place the thinking shows up.
+        <div
+          className="px-3 py-2 border-b text-sm text-warm-fog/70 italic whitespace-pre-wrap break-words"
+          style={{ borderColor: swatch.border, background: "rgba(0,0,0,0.18)" }}
+        >
+          <span
+            className="text-[9px] uppercase tracking-wider not-italic font-mono mr-2 text-patina"
+            style={{ letterSpacing: "0.08em" }}
+          >
+            [think]
+          </span>
+          {reasoning}
+        </div>
+      ) : null}
       <div className="p-3 text-sm whitespace-pre-wrap break-words text-warm-fog/90">
         {message.content ??
           (message.tool_calls?.length ? (
