@@ -75,19 +75,16 @@ function MsgLine({ message }: { message: LlmMessage }) {
   return (
     <div className="space-y-1">
       {reasoningTrunc ? (
-        // [THINK] row — surfaces reasoning_content so the user can see
-        // WHY the model reached for this tool, not just which tool it
-        // picked. Violet ("aether-violet") to signal reasoning as a
-        // distinct channel from the teal assistant / peach tool pair.
+        // TNK row — 3-char label so it column-aligns with SYS/USR/ASST
+        // pills on the same card. Solid violet border matches the
+        // role-pill styling. Violet ("aether-violet") signals reasoning
+        // as a distinct channel from teal assistant / peach tool.
         <div className="flex items-start gap-1.5 leading-relaxed">
           <span
             className="text-[9px] uppercase tracking-wider font-mono flex-shrink-0 px-1 rounded text-aether-violet"
-            style={{
-              border: "1px dashed rgba(167,139,250,0.45)",
-              background: "rgba(167,139,250,0.06)",
-            }}
+            style={{ border: "1px solid rgba(167,139,250,0.55)" }}
           >
-            think
+            tnk
           </span>
           <span className="flex-1 text-aether-violet/80 italic whitespace-pre-wrap">
             {reasoningTrunc}
