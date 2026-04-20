@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTrajectory } from "@/lib/api";
+import { isRedirectError } from "@/lib/fetch-utils";
 import { fetchTrajectoryHits } from "@/lib/triage";
 import { listRewrites } from "@/lib/rewrites";
 import { TrajectoryView } from "@/components/trajectory-view";
@@ -28,13 +29,15 @@ export default async function TrajectoryPage({
   let hits: import("@/lib/triage").HeuristicHit[] = [];
   try {
     hits = await fetchTrajectoryHits(id);
-  } catch {
+  } catch (err) {
+    if (isRedirectError(err)) throw err;
     // hits are best-effort; don't crash the page if triage API is absent
   }
   let rewrites: import("@/lib/rewrites").Rewrite[] = [];
   try {
     rewrites = await listRewrites(id);
-  } catch {
+  } catch (err) {
+    if (isRedirectError(err)) throw err;
     // rewrites are best-effort; don't crash the page if the endpoint is absent
   }
 
