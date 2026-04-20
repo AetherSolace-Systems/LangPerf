@@ -34,10 +34,13 @@ function MessageCard({ message }: { message: LlmMessage }) {
           }}
         >
           <span
-            className="text-[9px] uppercase tracking-wider not-italic font-mono mr-2 text-aether-violet"
-            style={{ letterSpacing: "0.08em" }}
+            className="text-[9px] uppercase tracking-wider not-italic font-mono mr-2 px-1 rounded text-aether-violet"
+            style={{
+              letterSpacing: "0.08em",
+              border: "1px solid rgba(167,139,250,0.55)",
+            }}
           >
-            [think]
+            tnk
           </span>
           {reasoning}
         </div>
