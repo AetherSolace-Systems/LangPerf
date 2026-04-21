@@ -16,6 +16,7 @@ dependencies = [
     "passlib[bcrypt]>=1.7.4",
     "email-validator>=2.0",
     "rfc8785>=0.1.4,<0.2",
+    "pynacl>=1.5,<2.0",
 ]
 
 [project.optional-dependencies]
