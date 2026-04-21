@@ -75,8 +75,34 @@ def test_compute_entry_hash_changes_if_any_input_changes():
         ("seq", 2),
         ("prev_hash", b"\xff" * 32),
         ("event_hash", b"\x00" * 32),
+        ("agent_id", b"\xfe" * 16),
+        ("principal_human_id", b"\xfe" * 16),
         ("ts_iso", "2026-04-22T00:00:00Z"),
+        ("agent_signature", b"\xfe" * 64),
         ("ingest_signature", b"\x00" * 64),
     ]:
         mutated = {**base, field: new_value}
         assert compute_entry_hash(**mutated) != h_base, f"{field} should affect entry_hash"
+
+
+def test_compute_entry_hash_distinguishes_none_from_bytes():
+    base = dict(
+        seq=1,
+        prev_hash=bytes(32),
+        event_hash=b"\xaa" * 32,
+        agent_id=None,
+        principal_human_id=None,
+        ts_iso="2026-04-21T00:00:00Z",
+        agent_signature=None,
+        ingest_signature=b"\xdd" * 64,
+    )
+    h_all_none = compute_entry_hash(**base)
+    for field, some_value in [
+        ("agent_id", b"\x00" * 16),
+        ("principal_human_id", b"\x00" * 16),
+        ("agent_signature", b"\x00" * 64),
+    ]:
+        mutated = {**base, field: some_value}
+        assert compute_entry_hash(**mutated) != h_all_none, (
+            f"None vs bytes transition on {field} must change entry_hash"
+        )
