@@ -3,6 +3,8 @@
 Golden-file tests gate every change to the canonicalizer; an accidental
 divergence would invalidate every historical signature.
 """
+import pytest
+
 from app.audit.canonical import canonical_encode, canonical_hash
 
 
@@ -41,3 +43,26 @@ def test_empty_dict_is_valid():
 
 def test_arrays_preserve_order():
     assert canonical_encode({"xs": [3, 1, 2]}) == b'{"xs":[3,1,2]}'
+
+
+def test_rejects_keys_that_collide_under_nfc():
+    # "e\u0301" (decomposed) and "\u00e9" (composed) are both "é" after NFC.
+    d = {"e\u0301": 1, "\u00e9": 2}
+    with pytest.raises(ValueError, match="collide"):
+        canonical_encode(d)
+
+
+def test_rejects_nan():
+    with pytest.raises(ValueError, match="not canonicalizable"):
+        canonical_encode({"x": float("nan")})
+
+
+def test_rejects_infinity():
+    with pytest.raises(ValueError, match="not canonicalizable"):
+        canonical_encode({"x": float("inf")})
+
+
+def test_float_and_int_canonicalize_identically_when_equal():
+    # rfc8785 strips trailing .0 per JCS number rules. Pin this behavior so a
+    # future library version can't silently change it.
+    assert canonical_encode({"a": 1.0}) == canonical_encode({"a": 1}) == b'{"a":1}'

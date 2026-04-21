@@ -18,7 +18,18 @@ def _nfc(obj: Any) -> Any:
     if isinstance(obj, str):
         return unicodedata.normalize("NFC", obj)
     if isinstance(obj, dict):
-        return {_nfc(k): _nfc(v) for k, v in obj.items()}
+        # Two distinct Python keys can be NFC-equal (e.g. decomposed "e\u0301"
+        # and composed "\u00e9"). Silently overwriting would be data loss in the
+        # wire contract — raise instead so the caller can fix the payload.
+        normalized: dict = {}
+        for k, v in obj.items():
+            nk = _nfc(k)
+            if nk in normalized:
+                raise ValueError(
+                    f"audit payload has keys that collide under Unicode NFC normalization: {nk!r}"
+                )
+            normalized[nk] = _nfc(v)
+        return normalized
     if isinstance(obj, list):
         return [_nfc(v) for v in obj]
     return obj
@@ -26,7 +37,14 @@ def _nfc(obj: Any) -> Any:
 
 def canonical_encode(payload: dict) -> bytes:
     """Return JCS-canonical bytes for ``payload``. NFC-normalized."""
-    return rfc8785.dumps(_nfc(payload))
+    nfc_payload = _nfc(payload)  # raises ValueError on NFC key collisions — let that propagate
+    try:
+        return rfc8785.dumps(nfc_payload)
+    except Exception as exc:
+        # rfc8785 raises on NaN / inf / unsupported types (FloatDomainError,
+        # etc.). Re-raise with audit-chain context so callers don't need to
+        # import the library's exception types, which have varied across versions.
+        raise ValueError(f"audit payload is not canonicalizable: {exc}") from exc
 
 
 def canonical_hash(payload: dict) -> bytes:
