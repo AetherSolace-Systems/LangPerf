@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type MouseEvent as ReactMouseEvent,
 } from "react";
 import type { Span } from "@/lib/api";
 import { AETHER, kindSwatch } from "@/lib/colors";
@@ -32,8 +33,28 @@ type Row = {
 };
 
 const LABEL_WIDTH = 240;
+const KIND_COL_WIDTH = 72; // fits "trajectory" / "retrieval" at 10px uppercase
 const DEFAULT_PX_PER_MS_MIN = 0.01;
 const DEFAULT_PX_PER_MS_MAX = 1000;
+
+/**
+ * Short-code for the row's kind column. Keeps column width fixed and
+ * rows aligned; full kind still visible via hover / detail panel.
+ */
+function shortKind(kind: string): string {
+  switch (kind) {
+    case "trajectory":
+      return "trj";
+    case "retrieval":
+      return "retr";
+    case "reasoning":
+      return "think";
+    case "generic":
+      return "span";
+    default:
+      return kind;
+  }
+}
 
 export function TrajectoryTimeline({ spans }: { spans: Span[] }) {
   const { selectedId, select } = useSelection();
@@ -85,8 +106,13 @@ export function TrajectoryTimeline({ spans }: { spans: Span[] }) {
 
   // Scroll container → we measure its width to drive "fit" zoom.
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  // Track container (the wide bit to the right of the label gutter) —
+  // ref is the anchor for the hover-line math so we get content-relative
+  // X regardless of horizontal scroll.
+  const trackAnchorRef = useRef<HTMLDivElement | null>(null);
   const [containerWidth, setContainerWidth] = useState<number>(800);
   const [pxPerMs, setPxPerMs] = useState<number | null>(null);
+  const [hoverX, setHoverX] = useState<number | null>(null);
 
   // Hydration-safe flag: any wall-clock text renders empty on the server + first
   // client render (so SSR and hydration match), then flips true after mount to
@@ -146,32 +172,59 @@ export function TrajectoryTimeline({ spans }: { spans: Span[] }) {
     );
   const fit = () => setPxPerMs(containerWidth / Math.max(1, totalMs));
 
+  // Mousemove handler lives on the outer wrapper so the line follows the
+  // cursor all the way across both the axis and the body rows. We snap
+  // hoverX to null whenever the pointer leaves the track area.
+  const handleMouseMove = (e: ReactMouseEvent<HTMLDivElement>) => {
+    const el = trackAnchorRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const x = e.clientX - r.left;
+    if (x < 0 || x > trackWidth) {
+      setHoverX(null);
+      return;
+    }
+    setHoverX(x);
+  };
+  const handleMouseLeave = () => setHoverX(null);
+
+  const hoverAbsMs =
+    hoverX != null ? trajectoryStartMs + hoverX / effectivePxPerMs : null;
+
   return (
-    <div className="relative h-full">
-      <ZoomControls
-        onZoomIn={zoomIn}
-        onZoomOut={zoomOut}
-        onFit={fit}
-        pxPerMs={effectivePxPerMs}
-      />
-      <div className="absolute top-2 left-4 z-30 text-[10px] font-mono text-patina pointer-events-none">
-        <span className="text-warm-fog/80">
-          {mounted ? fmtDate(trajectoryStartMs) : ""}
-        </span>
-        <span className="ml-2">
-          {mounted
-            ? `${fmtWallTime(trajectoryStartMs, { ms: true })} → ${fmtWallTime(
-                trajectoryEndMs,
-                { ms: true },
-              )}`
-            : ""}
-        </span>
-        <span className="ml-2">({fmtDuration(totalMs)})</span>
+    <div
+      className="relative h-full flex flex-col"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+    >
+      {/* Header strip — date/range summary + zoom controls. Lives OUTSIDE
+          the scroll container so it doesn't collide with the tick axis. */}
+      <div className="flex items-center justify-between gap-3 px-3 py-1 border-b border-[color:var(--border)] bg-carbon/60 flex-shrink-0">
+        <div className="text-[10px] font-mono text-patina truncate">
+          <span className="text-warm-fog/80">
+            {mounted ? fmtDate(trajectoryStartMs) : ""}
+          </span>
+          <span className="ml-2">
+            {mounted
+              ? `${fmtWallTime(trajectoryStartMs, { ms: true })} → ${fmtWallTime(
+                  trajectoryEndMs,
+                  { ms: true },
+                )}`
+              : ""}
+          </span>
+          <span className="ml-2">({fmtDuration(totalMs)})</span>
+        </div>
+        <ZoomControls
+          onZoomIn={zoomIn}
+          onZoomOut={zoomOut}
+          onFit={fit}
+          pxPerMs={effectivePxPerMs}
+        />
       </div>
 
       <div
         ref={scrollRef}
-        className="h-full overflow-auto font-mono text-xs"
+        className="relative flex-1 min-h-0 overflow-auto font-mono text-xs"
       >
         {/* Axis row — sticky to top so it stays visible while scrolling rows. */}
         <div
@@ -183,6 +236,7 @@ export function TrajectoryTimeline({ spans }: { spans: Span[] }) {
             style={{ width: LABEL_WIDTH, height: 32 }}
           />
           <div
+            ref={trackAnchorRef}
             className="relative"
             style={{ width: trackWidth, height: 32 }}
           >
@@ -224,6 +278,39 @@ export function TrajectoryTimeline({ spans }: { spans: Span[] }) {
             />
           ))}
         </div>
+
+        {/* Hover line — spans the full scroll content height (axis + all
+            rows), positioned in content coordinates so it tracks with
+            horizontal scroll. z-index sits above the rows (z-auto) and
+            the axis row (z-20) so it's visible everywhere the cursor
+            can land, but below the sticky left label gutter (z-10 on
+            each row's label) so labels don't get sliced. */}
+        {hoverX != null && mounted && hoverAbsMs != null ? (
+          <>
+            <div
+              className="absolute top-0 bottom-0 w-px pointer-events-none z-30"
+              style={{
+                left: LABEL_WIDTH + hoverX,
+                background: "rgba(167,139,250,0.8)",
+              }}
+            />
+            <div
+              className="absolute top-0 z-30 pointer-events-none px-1.5 py-0.5 text-[10px] font-mono tabular-nums rounded text-aether-violet"
+              style={{
+                left: LABEL_WIDTH + hoverX,
+                transform: "translateX(-50%)",
+                background: "var(--surface)",
+                border: "1px solid rgba(167,139,250,0.55)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {fmtWallTime(hoverAbsMs, { ms: true })}
+              <span className="text-patina ml-1.5">
+                +{fmtDuration(hoverAbsMs - trajectoryStartMs)}
+              </span>
+            </div>
+          </>
+        ) : null}
       </div>
     </div>
   );
@@ -241,7 +328,7 @@ function ZoomControls({
   pxPerMs: number;
 }) {
   return (
-    <div className="absolute top-1.5 right-3 z-30 flex items-center gap-1 bg-steel-mist/80 backdrop-blur border border-[color:var(--border)] rounded px-1.5 py-0.5">
+    <div className="flex items-center gap-1 bg-steel-mist/80 backdrop-blur border border-[color:var(--border)] rounded px-1.5 py-0.5 flex-shrink-0">
       <button
         type="button"
         onClick={onZoomOut}
@@ -310,10 +397,11 @@ function TimelineRow({
         style={{ width: LABEL_WIDTH, paddingLeft: `${row.depth * 12 + 12}px` }}
       >
         <span
-          className="text-[10px] uppercase tracking-wider flex-shrink-0"
-          style={{ color: swatch.fg, width: 50 }}
+          className="text-[10px] uppercase tracking-wider flex-shrink-0 truncate"
+          style={{ color: swatch.fg, width: KIND_COL_WIDTH }}
+          title={row.kind}
         >
-          {row.kind}
+          {shortKind(row.kind)}
         </span>
         <span className="flex-1 truncate text-warm-fog">{row.span.name}</span>
       </div>
@@ -349,4 +437,3 @@ function TimelineRow({
     </div>
   );
 }
-
