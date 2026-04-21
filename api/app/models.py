@@ -11,12 +11,15 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     JSON,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -29,6 +32,9 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 # fall back to portable types on other dialects (e.g. sqlite in tests).
 JsonB = JSON().with_variant(JSONB(), "postgresql")
 UUIDStr = String(36).with_variant(UUID(as_uuid=False), "postgresql")
+# SQLite only auto-increments INTEGER PKs, not BIGINT. Use INTEGER on sqlite,
+# BIGINT on Postgres so the audit tables work in both test lanes.
+BigIntPK = Integer().with_variant(BigInteger(), "postgresql")
 
 
 class Base(DeclarativeBase):
@@ -372,3 +378,81 @@ class Rewrite(Base):
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="draft")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class AuditEntry(Base):
+    """Append-only chain of audit events. Each row covers one event_type event.
+
+    seq is the monotone counter that establishes chain order; prev_hash chains
+    entries cryptographically so any gap or mutation is detectable.
+    ingest_node_id uses UUIDStr (String/UUID variant) to stay sqlite-compatible;
+    the Postgres migration uses PgUUID on the wire, but the ORM layer stays
+    dialect-agnostic like every other model here.
+    """
+
+    __tablename__ = "audit_entries"
+
+    id: Mapped[int] = mapped_column(BigIntPK, primary_key=True, autoincrement=True)
+    seq: Mapped[int] = mapped_column(BigInteger, nullable=False, unique=True)
+    prev_hash: Mapped[bytes] = mapped_column(LargeBinary(32), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    event_payload: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    event_hash: Mapped[bytes] = mapped_column(LargeBinary(32), nullable=False)
+    entry_hash: Mapped[bytes] = mapped_column(LargeBinary(32), nullable=False)
+    # Optional attribution — present when an agent or human principal is known.
+    agent_id: Mapped[Optional[str]] = mapped_column(UUIDStr, nullable=True)
+    principal_human_id: Mapped[Optional[str]] = mapped_column(UUIDStr, nullable=True)
+    agent_signature: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
+    ingest_node_id: Mapped[str] = mapped_column(UUIDStr, nullable=False)
+    ingest_signature: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    agent_ts: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        Index("ix_audit_entries_event_type_ts", "event_type", "ts"),
+        Index("ix_audit_entries_agent_id_ts", "agent_id", "ts"),
+        Index("ix_audit_entries_principal_human_id_ts", "principal_human_id", "ts"),
+    )
+
+
+class AuditRoot(Base):
+    """Merkle tree root checkpoints computed over a range of audit_entries.
+
+    tree_size is unique so each checkpoint covers a distinct prefix of the chain.
+    """
+
+    __tablename__ = "audit_roots"
+
+    id: Mapped[int] = mapped_column(BigIntPK, primary_key=True, autoincrement=True)
+    tree_size: Mapped[int] = mapped_column(BigInteger, nullable=False, unique=True)
+    root_hash: Mapped[bytes] = mapped_column(LargeBinary(32), nullable=False)
+    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ingest_node_id: Mapped[str] = mapped_column(UUIDStr, nullable=False)
+    ingest_signature: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+
+    anchors: Mapped[list["ExternalAnchor"]] = relationship(
+        back_populates="root", cascade="all, delete-orphan"
+    )
+
+
+class ExternalAnchor(Base):
+    """Record of an audit root published to an external transparency log.
+
+    anchor_type identifies the log (e.g. "none", "tlog"); anchor_ref is the
+    opaque reference returned by the log (e.g. a checkpoint URL or leaf hash).
+    """
+
+    __tablename__ = "external_anchors"
+
+    id: Mapped[int] = mapped_column(BigIntPK, primary_key=True, autoincrement=True)
+    root_id: Mapped[int] = mapped_column(
+        BigIntPK, ForeignKey("audit_roots.id"), nullable=False
+    )
+    anchor_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    anchor_payload: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    anchored_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    anchor_ref: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    root: Mapped["AuditRoot"] = relationship(back_populates="anchors")
+
+    __table_args__ = (Index("ix_external_anchors_root_id", "root_id"),)
