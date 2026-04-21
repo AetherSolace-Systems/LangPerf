@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { TrajectoryDetail } from "@/lib/api";
 import { fmtDuration } from "@/lib/format";
@@ -18,7 +18,34 @@ import { useCommentCounts } from "@/lib/comment-counts";
 import { TrajectoryTimeline } from "@/components/trajectory-timeline";
 import { TrajectoryTree } from "@/components/trajectory-tree";
 
-type LowerView = "graph" | "timeline";
+type PaneKey = "tree" | "timeline" | "graph";
+
+// Collapsed = not showing; expanded panes share the remaining vertical
+// space via flex-1. Persisted per-pane under one JSON blob so the user's
+// preferred combo survives reloads and navigations.
+const LAYOUT_STORAGE_KEY = "langperf.trajectory.collapsed";
+type CollapsedState = Record<PaneKey, boolean>;
+const DEFAULT_COLLAPSED: CollapsedState = {
+  tree: false,
+  timeline: false,
+  graph: false,
+};
+
+function loadCollapsed(): CollapsedState {
+  if (typeof window === "undefined") return DEFAULT_COLLAPSED;
+  try {
+    const raw = window.localStorage.getItem(LAYOUT_STORAGE_KEY);
+    if (!raw) return DEFAULT_COLLAPSED;
+    const parsed = JSON.parse(raw);
+    return {
+      tree: Boolean(parsed?.tree),
+      timeline: Boolean(parsed?.timeline),
+      graph: Boolean(parsed?.graph),
+    };
+  } catch {
+    return DEFAULT_COLLAPSED;
+  }
+}
 
 export function TrajectoryView({ trajectory }: { trajectory: TrajectoryDetail }) {
   const firstSpanId = trajectory.spans[0]?.span_id ?? null;
@@ -33,7 +60,20 @@ export function TrajectoryView({ trajectory }: { trajectory: TrajectoryDetail })
 
 function TrajectoryLayout({ trajectory }: { trajectory: TrajectoryDetail }) {
   const [notesOpen, setNotesOpen] = useState<boolean>(!!trajectory.notes);
-  const [lowerView, setLowerView] = useState<LowerView>("timeline");
+  const [collapsed, setCollapsed] = useState<CollapsedState>(DEFAULT_COLLAPSED);
+  // Hydrate from localStorage after mount to avoid SSR/CSR flashes.
+  useEffect(() => setCollapsed(loadCollapsed()), []);
+  const toggleCollapsed = useCallback((pane: PaneKey) => {
+    setCollapsed((prev) => {
+      const next = { ...prev, [pane]: !prev[pane] };
+      try {
+        window.localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // Private mode or quota — no-op; collapse still applies this session.
+      }
+      return next;
+    });
+  }, []);
   const commentCounts = useCommentCounts(trajectory);
   const { fsOpen, toggleFs, toggleExpandAll, collapseAll, setFs } = useFullscreen();
 
@@ -153,41 +193,32 @@ function TrajectoryLayout({ trajectory }: { trajectory: TrajectoryDetail }) {
 
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 min-w-0 flex flex-col border-r border-[color:var(--border)]">
-          <SectionHeader label="Tree" />
-          <div className="flex-shrink-0 overflow-y-auto max-h-[30%] border-b border-[color:var(--border)]">
-            <TrajectoryTree spans={trajectory.spans} />
-          </div>
-          <div className="flex-1 min-h-0 flex flex-col">
-            <SectionHeader
-              label={lowerView === "graph" ? "Graph" : "Timeline"}
-              right={
-                <div className="flex gap-1">
-                  <ToggleButton
-                    active={lowerView === "timeline"}
-                    onClick={() => setLowerView("timeline")}
-                  >
-                    timeline
-                  </ToggleButton>
-                  <ToggleButton
-                    active={lowerView === "graph"}
-                    onClick={() => setLowerView("graph")}
-                  >
-                    graph
-                  </ToggleButton>
-                </div>
-              }
-            />
-            <div className="flex-1 min-h-0">
-              {lowerView === "graph" ? (
-                <TrajectoryGraph
-                  spans={trajectory.spans}
-                  commentCounts={commentCounts}
-                />
-              ) : (
-                <TrajectoryTimeline spans={trajectory.spans} />
-              )}
+          <Pane
+            label="Tree"
+            collapsed={collapsed.tree}
+            onToggle={() => toggleCollapsed("tree")}
+          >
+            <div className="h-full overflow-y-auto">
+              <TrajectoryTree spans={trajectory.spans} />
             </div>
-          </div>
+          </Pane>
+          <Pane
+            label="Timeline"
+            collapsed={collapsed.timeline}
+            onToggle={() => toggleCollapsed("timeline")}
+          >
+            <TrajectoryTimeline spans={trajectory.spans} />
+          </Pane>
+          <Pane
+            label="Graph"
+            collapsed={collapsed.graph}
+            onToggle={() => toggleCollapsed("graph")}
+          >
+            <TrajectoryGraph
+              spans={trajectory.spans}
+              commentCounts={commentCounts}
+            />
+          </Pane>
         </div>
         <NodeDetailPanel trajectory={trajectory} />
       </div>
@@ -195,45 +226,55 @@ function TrajectoryLayout({ trajectory }: { trajectory: TrajectoryDetail }) {
   );
 }
 
-function Dot() {
-  return <span className="text-xs text-patina">·</span>;
-}
-
-function SectionHeader({
+/**
+ * Stacked collapsible section. Expanded panes share remaining vertical
+ * space (flex-1 + min-h-0 so children can shrink); collapsed panes
+ * shrink to just their header row. The caret rotates 0° → 90° on
+ * collapse for a cheap click-target affordance.
+ */
+function Pane({
   label,
-  right,
-}: {
-  label: string;
-  right?: React.ReactNode;
-}) {
-  return (
-    <div className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-patina bg-carbon/40 flex-shrink-0 border-b border-[color:var(--border)] flex items-center justify-between">
-      <span>{label}</span>
-      {right}
-    </div>
-  );
-}
-
-function ToggleButton({
-  active,
-  onClick,
+  collapsed,
+  onToggle,
   children,
 }: {
-  active: boolean;
-  onClick: () => void;
+  label: string;
+  collapsed: boolean;
+  onToggle: () => void;
   children: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`px-2 py-0.5 rounded border text-[10px] uppercase tracking-wider transition-colors ${
-        active
-          ? "border-aether-teal text-aether-teal bg-aether-teal/10"
-          : "border-[color:var(--border)] text-patina hover:text-warm-fog hover:border-patina"
-      }`}
+    <section
+      className={
+        "flex flex-col border-b border-[color:var(--border)] last:border-b-0 " +
+        (collapsed ? "flex-shrink-0" : "flex-1 min-h-0")
+      }
     >
-      {children}
-    </button>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={!collapsed}
+        aria-controls={`pane-${label.toLowerCase()}-body`}
+        className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-patina bg-carbon/40 flex-shrink-0 flex items-center gap-2 hover:text-warm-fog hover:bg-carbon/60 transition-colors text-left"
+      >
+        <span
+          aria-hidden
+          className="inline-block transition-transform duration-150"
+          style={{ transform: collapsed ? "rotate(0deg)" : "rotate(90deg)" }}
+        >
+          ›
+        </span>
+        <span>{label}</span>
+      </button>
+      {collapsed ? null : (
+        <div id={`pane-${label.toLowerCase()}-body`} className="flex-1 min-h-0">
+          {children}
+        </div>
+      )}
+    </section>
   );
+}
+
+function Dot() {
+  return <span className="text-xs text-patina">·</span>;
 }
