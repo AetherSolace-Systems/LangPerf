@@ -5,8 +5,8 @@ test("graph toolbar shows expand/compact/fullscreen controls", async ({ page }) 
   const tid = await firstRunId(page);
   await page.goto(`/t/${tid}`);
 
-  // Switch to graph view (default is timeline)
-  await page.getByRole("button", { name: /^graph$/i }).click();
+  // Tree / Timeline / Graph are now independently-collapsible panes;
+  // Graph is expanded by default, so its toolbar renders on load.
 
   await expect(page.getByRole("button", { name: /expand all/i })).toBeVisible();
   await expect(page.getByRole("button", { name: /compact all/i })).toBeVisible();
