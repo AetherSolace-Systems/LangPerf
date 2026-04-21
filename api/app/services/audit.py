@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,7 +28,7 @@ class AuditService:
         self,
         *,
         event_type: str,
-        payload: dict,
+        payload: dict[str, Any],
         ingest_node_id: uuid.UUID,
         ingest_private_key: bytes,
         ingest_alg: str,
@@ -39,6 +40,10 @@ class AuditService:
         event_bytes = canonical_encode(payload)
         event_hash = sha256(event_bytes)
 
+        # Baseline path — known-unsafe under concurrency. Two simultaneous
+        # appends can both read seq=0 and both try to INSERT seq=1, violating
+        # the UNIQUE constraint. Task 11 (Writer) serializes via an in-process
+        # queue with a single leader-elected writer.
         prev = (
             await self._session.execute(
                 select(AuditEntry).order_by(AuditEntry.seq.desc()).limit(1)
