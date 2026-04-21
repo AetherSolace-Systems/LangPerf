@@ -18,6 +18,7 @@ dependencies = [
     "rfc8785>=0.1.4,<0.2",
     "pynacl>=1.5,<2.0",
     "cryptography>=42,<47",
+    "asn1crypto>=1.5,<2.0",
 ]
 
 [project.optional-dependencies]
