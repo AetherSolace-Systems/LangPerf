@@ -6,8 +6,6 @@ legacy FIPS environments. Vetted libraries only: ``pynacl`` for Ed25519,
 """
 from __future__ import annotations
 
-from typing import Tuple
-
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -43,7 +41,7 @@ class _P384PublicKey:
         return self._key
 
 
-def generate_keypair(alg: str) -> Tuple[bytes, bytes]:
+def generate_keypair(alg: str) -> tuple[bytes, bytes]:
     """Return ``(private_bytes, public_bytes)`` for ``alg``."""
     if alg == SIG_ED25519:
         priv = NaclSigningKey.generate()
@@ -82,23 +80,28 @@ def sign(private_bytes: bytes, data: bytes, alg: str) -> bytes:
     raise ValueError(f"unknown algorithm: {alg!r}")
 
 
-def verify(public_bytes: bytes, signature: bytes, data: bytes, alg: str) -> None:
-    """Raise ``VerifyError`` if ``signature`` does not verify ``data``."""
+def verify(public_bytes: bytes | _P384PublicKey, signature: bytes, data: bytes, alg: str) -> None:
+    """Raise ``VerifyError`` if ``signature`` does not verify ``data``.
+
+    Malformed key bytes (wrong length for Ed25519; non-PEM for P-384) also
+    surface as ``VerifyError`` rather than leaking ``ValueError`` from the
+    underlying library.
+    """
     if alg == SIG_ED25519:
         try:
             NaclVerifyKey(public_bytes).verify(data, signature)
-        except BadSignatureError as exc:
-            raise VerifyError("ed25519 signature invalid") from exc
+        except (ValueError, BadSignatureError) as exc:
+            raise VerifyError(f"ed25519 verification failed: {exc}") from exc
         return
     if alg == SIG_ECDSA_P384:
-        # Accept either raw PEM bytes or the _P384PublicKey wrapper.
-        if isinstance(public_bytes, _P384PublicKey):
-            pub = public_bytes.raw
-        else:
-            pub = serialization.load_pem_public_key(public_bytes)
         try:
+            # Accept either raw PEM bytes or the _P384PublicKey wrapper.
+            if isinstance(public_bytes, _P384PublicKey):
+                pub = public_bytes.raw
+            else:
+                pub = serialization.load_pem_public_key(public_bytes)
             pub.verify(signature, data, ec.ECDSA(hashes.SHA384()))
-        except InvalidSignature as exc:
-            raise VerifyError("ecdsa-p384 signature invalid") from exc
+        except (ValueError, InvalidSignature) as exc:
+            raise VerifyError(f"ecdsa-p384 verification failed: {exc}") from exc
         return
     raise ValueError(f"unknown algorithm: {alg!r}")

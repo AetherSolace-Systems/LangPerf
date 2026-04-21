@@ -49,3 +49,17 @@ def test_unknown_algorithm_raises():
     priv, _ = generate_keypair(SIG_ED25519)
     with pytest.raises(ValueError, match="unknown algorithm"):
         sign(priv, b"x", "not-an-alg")
+
+
+def test_verify_raises_verify_error_for_malformed_ed25519_key():
+    priv, _ = generate_keypair(SIG_ED25519)
+    sig = sign(priv, b"x", SIG_ED25519)
+    with pytest.raises(VerifyError):
+        verify(b"not-a-key", sig, b"x", SIG_ED25519)
+
+
+def test_verify_raises_verify_error_for_malformed_p384_key():
+    priv, _ = generate_keypair(SIG_ECDSA_P384)
+    sig = sign(priv, b"x", SIG_ECDSA_P384)
+    with pytest.raises(VerifyError):
+        verify(b"not-pem-bytes", sig, b"x", SIG_ECDSA_P384)
