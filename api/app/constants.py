@@ -46,6 +46,7 @@ ATTR_NODE_NAME = "langperf.node.name"
 # reflect SDK-side marks.
 ATTR_STATUS_TAG = "langperf.status_tag"
 ATTR_NOTES = "langperf.notes"
+ATTR_COMPLETED = "langperf.completed"
 
 # User attribution — informational; not yet first-class on the trajectory row.
 ATTR_USER_ID = "langperf.user.id"
