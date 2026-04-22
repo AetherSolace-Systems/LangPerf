@@ -163,3 +163,43 @@ async def seed_agent_with_trajectories(session, seed_agent):
         await session.commit()
         return agent
     return _factory
+
+
+@pytest_asyncio.fixture
+async def seed_agent_with_heuristic_hits(session, seed_agent):
+    """Seed an agent + trajectories each with a HeuristicHit.
+
+    Each hit spec: `{"heuristic": "tool_error", "tool": "search_orders", "count": 12}`.
+    `count` hits are created, each on its own trajectory, all at `now`.
+    """
+    from datetime import datetime, timezone
+    from app.models import Trajectory, HeuristicHit
+
+    async def _factory(*, hits):
+        agent = await seed_agent()
+        now = datetime.now(timezone.utc)
+        for spec in hits:
+            for _ in range(spec["count"]):
+                traj = Trajectory(
+                    id=str(_uuid.uuid4()),
+                    org_id=agent.org_id,
+                    service_name=agent.name,
+                    agent_id=agent.id,
+                    started_at=now,
+                )
+                session.add(traj)
+                await session.flush()
+                hit = HeuristicHit(
+                    id=str(_uuid.uuid4()),
+                    org_id=agent.org_id,
+                    trajectory_id=traj.id,
+                    heuristic=spec["heuristic"],
+                    severity=0.5,  # heuristic's internal severity, not worklist scoring
+                    signature=f"{spec['heuristic']}:{spec.get('tool', 'none')}",
+                    details={"tool": spec.get("tool")} if spec.get("tool") else {},
+                    created_at=now,
+                )
+                session.add(hit)
+        await session.commit()
+        return agent
+    return _factory

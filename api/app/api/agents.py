@@ -25,6 +25,7 @@ from app.schemas import (
 )
 from app.services import agent_metrics as metrics_service
 from app.services import agent_timeseries
+from app.services import agent_worklist
 from app.services import agents as agents_service
 from app.services.agents import AgentCreate
 
@@ -194,3 +195,16 @@ async def get_agent_timeseries(
     return await agent_timeseries.compute(
         session, agent_id=agent.id, window=window, metrics=metric_list
     )
+
+
+@router.get("/{name}/worklist")
+async def get_agent_worklist(
+    name: str,
+    window: str = Query(default="7d", pattern="^(24h|7d|30d)$"),
+    session: AsyncSession = Depends(get_session),
+    user=require_user(),
+) -> list[dict]:
+    if window not in agent_worklist.WINDOW_HOURS:
+        raise HTTPException(status_code=400, detail=f"invalid window {window!r}")
+    agent = await agents_service.resolve_agent(session, name, user.org_id)
+    return await agent_worklist.compute(session, agent_id=agent.id, window=window)
