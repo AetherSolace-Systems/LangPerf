@@ -1,5 +1,6 @@
 """LangPerf Python SDK — tracer for agent trajectories."""
 
+from langperf.feedback import feedback
 from langperf.marks import current_trajectory_id, mark, metric, set_user
 from langperf.node import node
 from langperf.tool import tool
@@ -16,5 +17,6 @@ __all__ = [
     "metric",
     "set_user",
     "current_trajectory_id",
+    "feedback",
 ]
 __version__ = "0.2.1"
