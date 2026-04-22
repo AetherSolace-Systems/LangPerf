@@ -306,6 +306,58 @@ export async function getAgentTools(
   );
 }
 
+export type WorklistUrgency = "high" | "med" | "low";
+
+export type WorklistItem = {
+  signal: string;
+  title: string;
+  subtitle: string;
+  affected_runs: number;
+  last_seen_at: string;
+  severity: number;
+  score: number;
+  urgency: WorklistUrgency;
+};
+
+export type TrendBucket = {
+  ts_ms: number;
+  value: number | null;
+  count: number;
+};
+
+export type MetricSeries = {
+  metric: string;
+  window: TimeWindow;
+  step_ms: number;
+  buckets: TrendBucket[];
+};
+
+export async function getAgentWorklist(
+  name: string,
+  window: TimeWindow,
+): Promise<WorklistItem[]> {
+  const res = await fetch(
+    `${apiBase()}/api/agents/${encodeURIComponent(name)}/worklist?window=${window}`,
+    { cache: "no-store", credentials: "include" },
+  );
+  if (!res.ok) throw new Error(`getAgentWorklist ${res.status}`);
+  return res.json();
+}
+
+export async function getAgentTimeseries(
+  name: string,
+  window: TimeWindow,
+  metrics: string[],
+): Promise<MetricSeries[]> {
+  const q = metrics.join(",");
+  const res = await fetch(
+    `${apiBase()}/api/agents/${encodeURIComponent(name)}/timeseries?window=${window}&metrics=${q}`,
+    { cache: "no-store", credentials: "include" },
+  );
+  if (!res.ok) throw new Error(`getAgentTimeseries ${res.status}`);
+  return res.json();
+}
+
 export type LogForwardingConfig = {
   file: {
     enabled: boolean;
