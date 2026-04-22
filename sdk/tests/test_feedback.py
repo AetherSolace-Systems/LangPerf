@@ -1,9 +1,8 @@
 """langperf.feedback() POST behavior + retry semantics."""
 from __future__ import annotations
 
-import threading
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
