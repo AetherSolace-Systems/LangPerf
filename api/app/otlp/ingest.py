@@ -259,6 +259,9 @@ def _apply_sdk_signals(trajectory: Trajectory, span: DecodedSpan) -> bool:
         changed = True
 
     completed = attrs.get(ATTR_COMPLETED)
+    # Decoder normalizes OTLP AnyValue.bool_value to native bool; reject
+    # string ("true") or int (1) encodings so a misstamped SDK surfaces
+    # as "unknown" rather than silently writing the wrong value.
     if isinstance(completed, bool) and trajectory.completed != completed:
         trajectory.completed = completed
         changed = True
