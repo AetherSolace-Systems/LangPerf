@@ -70,7 +70,6 @@ async def receive_feedback(
         marker = "[👎 feedback]" if payload.thumbs == "down" else "[👍 feedback]"
         traj.notes = f"{existing}{separator}{marker} {payload.note}"
 
-    session.add(traj)
     await session.commit()
     return Response(status_code=204)
 
