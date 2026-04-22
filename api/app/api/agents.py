@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import Response as FastAPIResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import require_user
@@ -24,6 +25,7 @@ from app.schemas import (
     AgentToolUsage,
 )
 from app.services import agent_metrics as metrics_service
+from app.services import agent_profile
 from app.services import agent_timeseries
 from app.services import agent_worklist
 from app.services import agents as agents_service
@@ -208,3 +210,26 @@ async def get_agent_worklist(
         raise HTTPException(status_code=400, detail=f"invalid window {window!r}")
     agent = await agents_service.resolve_agent(session, name, user.org_id)
     return await agent_worklist.compute(session, agent_id=agent.id, window=window)
+
+
+@router.get("/{name}/profile.md")
+async def get_agent_profile_md(
+    name: str,
+    window: str = "7d",
+    session: AsyncSession = Depends(get_session),
+    user=require_user(),
+):
+    if window not in agent_worklist.WINDOW_HOURS:
+        raise HTTPException(status_code=400, detail=f"invalid window {window!r}")
+    agent = await agents_service.resolve_agent(session, name, user.org_id)
+    if agent is None:
+        raise HTTPException(status_code=404, detail="agent not found")
+    body = await agent_profile.render_markdown(
+        session, agent_id=agent.id, window=window
+    )
+    filename = f"agent-{agent.name}-profile.md"
+    return FastAPIResponse(
+        content=body,
+        media_type="text/markdown",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
