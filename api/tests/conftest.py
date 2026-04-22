@@ -118,3 +118,48 @@ async def seed_agent_with_trajectory(session, seed_agent):
         await session.commit()
         return agent, traj
     return _factory
+
+
+@pytest_asyncio.fixture
+async def seed_agent_with_trajectories(session, seed_agent):
+    """Seed an agent + multiple trajectories with configurable properties.
+
+    Each trajectory spec supports:
+        started_at_minus_hours: float (default 0) — how long ago the traj started
+        duration_ms: int | None
+        feedback_thumbs_down: int (default 0)
+        feedback_thumbs_up: int (default 0)
+        completed: bool | None (default None)
+    """
+    from datetime import datetime, timedelta, timezone
+    from app.models import Trajectory
+
+    async def _factory(*, trajectories):
+        agent = await seed_agent()
+        now = datetime.now(timezone.utc)
+        created = []
+        for spec in trajectories:
+            started = now - timedelta(hours=spec.get("started_at_minus_hours", 0))
+            duration_ms = spec.get("duration_ms")
+            ended = (
+                started + timedelta(milliseconds=duration_ms)
+                if duration_ms is not None
+                else None
+            )
+            traj = Trajectory(
+                id=str(_uuid.uuid4()),
+                org_id=agent.org_id,
+                service_name=agent.name,
+                agent_id=agent.id,
+                started_at=started,
+                ended_at=ended,
+                duration_ms=duration_ms,
+                feedback_thumbs_down=spec.get("feedback_thumbs_down", 0),
+                feedback_thumbs_up=spec.get("feedback_thumbs_up", 0),
+                completed=spec.get("completed"),
+            )
+            session.add(traj)
+            created.append(traj)
+        await session.commit()
+        return agent
+    return _factory

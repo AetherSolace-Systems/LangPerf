@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import require_user
@@ -24,6 +24,7 @@ from app.schemas import (
     AgentToolUsage,
 )
 from app.services import agent_metrics as metrics_service
+from app.services import agent_timeseries
 from app.services import agents as agents_service
 from app.services.agents import AgentCreate
 
@@ -172,4 +173,24 @@ async def get_agent_prompts(
 ) -> list[AgentPromptRow]:
     return await metrics_service.get_agent_prompts(
         session, org_id=user.org_id, name=name, limit=limit
+    )
+
+
+@router.get("/{name}/timeseries")
+async def get_agent_timeseries(
+    name: str,
+    window: str = Query(default="7d", pattern="^(24h|7d|30d)$"),
+    metrics: str = Query(default="p95_latency,cost_per_1k,tool_success,feedback_down"),
+    session: AsyncSession = Depends(get_session),
+    user=require_user(),
+) -> list[dict]:
+    if window not in agent_timeseries.WINDOW_CONFIG:
+        raise HTTPException(status_code=400, detail=f"invalid window {window!r}")
+    metric_list = [m.strip() for m in metrics.split(",") if m.strip()]
+    unknown = [m for m in metric_list if m not in agent_timeseries.SUPPORTED_METRICS]
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"unknown metrics {unknown}")
+    agent = await agents_service.resolve_agent(session, name, user.org_id)
+    return await agent_timeseries.compute(
+        session, agent_id=agent.id, window=window, metrics=metric_list
     )
