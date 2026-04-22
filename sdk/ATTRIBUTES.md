@@ -50,6 +50,7 @@ Non-root spans carrying these keys are intentionally ignored.
 | --- | --- | --- | --- |
 | `langperf.status_tag` | enum string (`"good"`, `"bad"`, `"interesting"`, `"todo"`) | `mark(tag=)`, trajectory kwarg | Ingest → `Trajectory.status_tag` |
 | `langperf.notes` | string | `mark(note=)` | Ingest → `Trajectory.notes` |
+| `langperf.completed` | bool | trajectory context manager `__exit__` (auto) | Ingest → `Trajectory.completed` |
 | `langperf.note` | string | legacy per-node note | UI span detail panel |
 
 ## User / session attribution (root span only)
