@@ -21,6 +21,7 @@ from app.api.failure_modes import router as failure_modes_router
 from app.api import triage as triage_api
 from app.api import clusters as clusters_api
 from app.api import rewrites as rewrites_api
+from app.api import feedback as feedback_api
 from app.api.logs import router as logs_router
 from app.api.nodes import router as nodes_router
 from app.api.overview import router as overview_router
@@ -135,3 +136,4 @@ app.include_router(failure_modes_router)
 app.include_router(triage_api.router)
 app.include_router(clusters_api.router)
 app.include_router(rewrites_api.router)
+app.include_router(feedback_api.router)
