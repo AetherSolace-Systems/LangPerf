@@ -107,6 +107,12 @@ class _Trajectory:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         try:
+            # Stamp completion BEFORE closing the span context. Otherwise
+            # the span is already ended and the attribute silently drops.
+            if self._span is not None:
+                self._span.set_attribute(
+                    "langperf.completed", exc_type is None
+                )
             if self._span_cm is not None:
                 self._span_cm.__exit__(exc_type, exc_val, exc_tb)
         finally:
