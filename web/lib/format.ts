@@ -19,3 +19,20 @@ export function safeJsonParse(value: unknown): unknown {
     return value;
   }
 }
+
+/**
+ * Render a coarse, human-readable duration — picks the largest non-zero unit
+ * (ms | s | m | h | d). Used for resumption-gap labels where "3600000ms"
+ * or "3600s" would obscure the shape of the pause.
+ */
+export function fmtDurationHuman(ms: number): string {
+  if (ms < 1000) return `${Math.max(0, Math.round(ms))}ms`;
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.round(h / 24);
+  return `${d}d`;
+}
