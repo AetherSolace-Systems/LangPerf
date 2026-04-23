@@ -284,3 +284,60 @@ between SDK and backend; see `ATTRIBUTES.md`.
 No breaking changes. New surface: `tool`, `mark`, `metric`, `set_user`,
 `current_trajectory_id`, plus `user_id`/`session_id`/`metadata` kwargs on
 `trajectory()` and `metadata` on `node()`.
+
+## Durable trajectories
+
+For agents whose execution spans multiple processes — e.g. Temporal
+workflows, queue-backed jobs, async human-in-the-loop flows — you can
+thread every process segment into a single trajectory by passing a
+stable `id=` on each `with langperf.trajectory(...)` block. LangPerf
+observes; your app owns durability (persist the `id` alongside the
+workflow state).
+
+### Pattern
+
+```python
+import langperf
+import uuid
+
+langperf.init()
+
+# Your app persists run_id with its workflow state.
+run_id = str(uuid.uuid4())
+
+# Segment 1 — kickoff; process exits after this.
+with langperf.trajectory("support_agent", id=run_id, final=False):
+    emit_approval_request()  # posts to Slack; returns immediately
+
+# ... minutes/hours/days later, webhook wakes a fresh process ...
+
+# Segment 2 — resume; still not the end.
+with langperf.trajectory("support_agent", id=run_id, final=False):
+    process_approval()
+
+# Final segment — stamps completion.
+with langperf.trajectory("support_agent", id=run_id, final=True):
+    emit_final_report()
+# → one Trajectory row spans all three segments; `completed=True` is
+#   stamped here.
+```
+
+### Rules
+
+- `id` must be a UUID string. To map a non-UUID key (e.g. a Temporal
+  workflow ID), hash it: `id=str(uuid.uuid5(NAMESPACE, workflow_id))`.
+- Pass `final=False` on every non-last segment so `langperf.completed`
+  isn't prematurely stamped. The last segment uses `final=True` (the
+  default).
+- If the process dies before any segment finalizes, the trajectory's
+  `completed` stays NULL and the UI shows "unknown" — same as any
+  abandoned run today.
+
+See `examples/durable_agent.py` for a runnable queue-based example.
+
+### When *not* to use `id=`
+
+Chat turns and single-process autonomous runs should keep using the
+default (no `id` kwarg) — the SDK autogenerates a fresh UUID per
+`with` block. For chat, pass `session_id=` instead to tie multiple
+turns together in the UI without merging their spans.

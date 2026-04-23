@@ -12,6 +12,7 @@ import type { Span } from "@/lib/api";
 import { AETHER, kindSwatch } from "@/lib/colors";
 import { useSelection } from "@/components/selection-context";
 import { fmtDuration } from "@/lib/format";
+import { buildSegments } from "@/lib/segments";
 import { kindOf } from "@/lib/span-fields";
 import {
   buildTicks,
@@ -102,6 +103,31 @@ export function TrajectoryTimeline({ spans }: { spans: Span[] }) {
       trajectoryEndMs: allEnd,
       totalMs: total,
     };
+  }, [spans]);
+
+  // Durable-run resumption gaps — dashed bands on the axis track that
+  // make long pauses between segments visually obvious. Empty array
+  // for single-segment trajectories.
+  const gapBands = useMemo(() => {
+    const segs = buildSegments(spans);
+    if (segs.length < 2) return [] as Array<{ offsetMs: number; widthMs: number }>;
+    const toMs = (iso: string) => new Date(iso).getTime();
+    const allStart = Math.min(...spans.map((s) => toMs(s.started_at)));
+    const bands: Array<{ offsetMs: number; widthMs: number }> = [];
+    for (let i = 1; i < segs.length; i++) {
+      const prev = segs[i - 1].root;
+      const prevEnd = prev.ended_at
+        ? toMs(prev.ended_at)
+        : toMs(prev.started_at) + (prev.duration_ms ?? 0);
+      const curStart = toMs(segs[i].root.started_at);
+      const gap = curStart - prevEnd;
+      // Threshold: only draw for gaps > 1s. Sub-second gaps between
+      // segments are numerically multi-segment but visually trivial.
+      if (gap > 1000) {
+        bands.push({ offsetMs: prevEnd - allStart, widthMs: gap });
+      }
+    }
+    return bands;
   }, [spans]);
 
   // Scroll container → we measure its width to drive "fit" zoom.
@@ -262,6 +288,23 @@ export function TrajectoryTimeline({ spans }: { spans: Span[] }) {
                 </div>
               );
             })}
+            {gapBands.map((g, i) => {
+              const leftPx = g.offsetMs * effectivePxPerMs;
+              const widthPx = Math.max(2, g.widthMs * effectivePxPerMs);
+              return (
+                <div
+                  key={`axis-gap-${i}`}
+                  className="absolute top-0 bottom-0 pointer-events-none"
+                  style={{
+                    left: leftPx,
+                    width: widthPx,
+                    background:
+                      "repeating-linear-gradient(90deg, rgba(167,139,250,0.18) 0 6px, transparent 6px 12px)",
+                  }}
+                  aria-hidden="true"
+                />
+              );
+            })}
           </div>
         </div>
 
@@ -278,6 +321,34 @@ export function TrajectoryTimeline({ spans }: { spans: Span[] }) {
             />
           ))}
         </div>
+
+        {/* Resumption gap bands — dashed overlay across the full body
+            height so long pauses between segments are legible in the
+            timeline body as well as the axis. */}
+        {gapBands.length > 0 ? (
+          <div
+            className="absolute top-0 bottom-0 pointer-events-none"
+            style={{ left: LABEL_WIDTH, width: trackWidth }}
+          >
+            {gapBands.map((g, i) => {
+              const leftPx = g.offsetMs * effectivePxPerMs;
+              const widthPx = Math.max(2, g.widthMs * effectivePxPerMs);
+              return (
+                <div
+                  key={`body-gap-${i}`}
+                  className="absolute top-0 bottom-0"
+                  style={{
+                    left: leftPx,
+                    width: widthPx,
+                    background:
+                      "repeating-linear-gradient(90deg, rgba(167,139,250,0.10) 0 6px, transparent 6px 12px)",
+                  }}
+                  aria-hidden="true"
+                />
+              );
+            })}
+          </div>
+        ) : null}
 
         {/* Hover line — spans the full scroll content height (axis + all
             rows), positioned in content coordinates so it tracks with

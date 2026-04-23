@@ -3,6 +3,18 @@
 All notable changes to the `langperf` SDK. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Semver: [SemVer 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-04-23
+
+### Added
+- `langperf.trajectory(id=...)` — optional caller-provided UUID. When
+  supplied, the SDK uses it verbatim instead of autogenerating, letting
+  multiple process segments of a durable/resumable run share one
+  `Trajectory` row on the backend. Invalid UUIDs raise `ValueError` at
+  `__enter__`. See `sdk/README.md` §"Durable trajectories".
+- `langperf.trajectory(final=...)` — defaults to `True` (prior
+  behavior). Pass `final=False` on all non-last segments of a durable
+  run so `langperf.completed` is only stamped when the run truly ends.
+
 ## [0.3.0] — 2026-04-22
 
 ### Added
