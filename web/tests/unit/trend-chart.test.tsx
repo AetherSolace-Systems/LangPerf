@@ -17,7 +17,7 @@ describe("TrendChart", () => {
         <TrendChart
           metric="p95_latency"
           buckets={BUCKETS}
-          format={(v) => `${v}ms`}
+          format="latency_ms"
           color="#6BBAB1"
         />
       </SharedCursorProvider>,
@@ -36,7 +36,7 @@ describe("TrendChart", () => {
     ];
     const { container } = render(
       <SharedCursorProvider>
-        <TrendChart metric="x" buckets={data} format={(v) => `${v}`} color="#fff" />
+        <TrendChart metric="x" buckets={data} format="int" color="#fff" />
       </SharedCursorProvider>,
     );
     const polyline = container.querySelector("polyline");
@@ -49,7 +49,7 @@ describe("TrendChart", () => {
         <TrendChart
           metric="p95_latency"
           buckets={BUCKETS}
-          format={(v) => `${v}ms`}
+          format="latency_ms"
           color="#6BBAB1"
         />
       </SharedCursorProvider>,
