@@ -86,7 +86,7 @@ function MsgLine({ message }: { message: LlmMessage }) {
           >
             tnk
           </span>
-          <span className="flex-1 text-aether-violet/80 italic whitespace-pre-wrap">
+          <span className="flex-1 text-warm-fog whitespace-pre-wrap">
             {reasoningTrunc}
           </span>
         </div>
