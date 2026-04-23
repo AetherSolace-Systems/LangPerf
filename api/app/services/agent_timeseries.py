@@ -14,7 +14,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable
 
-from sqlalchemy import Integer, case, func, select
+from sqlalchemy import BigInteger, Integer, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Span, Trajectory
@@ -91,8 +91,10 @@ def _sql_bucket_key(column, step_ms: int):
     Portable across sqlite and postgres: both accept EXTRACT(EPOCH FROM ts).
     CAST to Integer gives floor semantics on both dialects.
     """
-    epoch_ms = func.cast(func.extract("epoch", column) * 1000, Integer)
-    return func.cast(epoch_ms / step_ms, Integer) * step_ms
+    # BigInteger — epoch-ms for any timestamp past 1970-01-25 exceeds the
+    # ~2.1B limit of Postgres's 32-bit INTEGER. Floor via BIGINT cast.
+    epoch_ms = func.cast(func.extract("epoch", column) * 1000, BigInteger)
+    return func.cast(epoch_ms / step_ms, BigInteger) * step_ms
 
 
 async def _compute_metric(
