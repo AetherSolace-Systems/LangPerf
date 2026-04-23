@@ -221,6 +221,13 @@ class Trajectory(Base):
     assigned_user_id: Mapped[str | None] = mapped_column(
         UUIDStr, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    feedback_thumbs_down: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False
+    )
+    feedback_thumbs_up: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False
+    )
+    completed: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
 
     spans: Mapped[list["Span"]] = relationship(
         back_populates="trajectory",

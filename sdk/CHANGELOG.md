@@ -3,6 +3,24 @@
 All notable changes to the `langperf` SDK. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Semver: [SemVer 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-04-22
+
+### Added
+- `langperf.feedback(trajectory_id, thumbs, note=)` — record end-user
+  thumbs-up/down feedback on a trajectory from the application. Fire-and-
+  forget with 3-retry backoff; never raises. Bridges to
+  `Trajectory.feedback_thumbs_down` / `_up` via the new `/v1/feedback`
+  ingest endpoint.
+- `langperf.completed` span attribute — the trajectory context manager
+  now stamps `True` on clean exit and `False` if an exception propagates.
+  Backend writes this to `Trajectory.completed` (null on legacy rows).
+  Documented in `ATTRIBUTES.md`.
+
+### Notes
+- Backend endpoints added in the same release: `POST /v1/feedback`,
+  `GET /api/agents/:name/worklist`, `GET /api/agents/:name/timeseries`,
+  `GET /api/agents/:name/profile.md`, `GET /api/agents/:name/failures.csv`.
+
 ## [0.2.1] — 2026-04-20
 
 ### Changed

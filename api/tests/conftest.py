@@ -1,4 +1,5 @@
 import os
+import uuid as _uuid
 from collections.abc import AsyncGenerator
 
 import pytest
@@ -55,3 +56,150 @@ async def client(session_factory) -> AsyncGenerator[AsyncClient, None]:
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
     app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture
+async def seed_agent(session):
+    """Seed an org + default project + agent with a minted raw token.
+    The raw token is attached to the agent as `agent.raw_token` (test-only
+    attribute) so tests can use it as Bearer auth."""
+    from sqlalchemy import select
+    from app.auth.agent_token import generate_token, hash_token
+    from app.models import Agent, Organization, Project
+
+    async def _factory():
+        org = (await session.execute(select(Organization).limit(1))).scalar_one_or_none()
+        if org is None:
+            org = Organization(id=str(_uuid.uuid4()), name="Acme", slug="acme")
+            session.add(org)
+            await session.flush()
+
+        proj = (await session.execute(
+            select(Project).where(Project.org_id == org.id, Project.slug == "default")
+        )).scalar_one_or_none()
+        if proj is None:
+            proj = Project(id=str(_uuid.uuid4()), org_id=org.id, name="Default", slug="default")
+            session.add(proj)
+            await session.flush()
+
+        token, prefix = generate_token()
+        agent = Agent(
+            id=str(_uuid.uuid4()),
+            org_id=org.id,
+            project_id=proj.id,
+            signature=f"sig-{_uuid.uuid4()}",
+            name=f"test-agent-{_uuid.uuid4().hex[:8]}",
+            language="python",
+            token_hash=hash_token(token),
+            token_prefix=prefix,
+        )
+        session.add(agent)
+        await session.commit()
+        agent.raw_token = token  # type: ignore[attr-defined]  # test-only convenience
+        return agent
+    return _factory
+
+
+@pytest_asyncio.fixture
+async def seed_agent_with_trajectory(session, seed_agent):
+    """Seed an agent PLUS a trajectory row bound to it."""
+    from app.models import Trajectory
+
+    async def _factory(*, notes=None):
+        agent = await seed_agent()
+        traj = Trajectory(
+            id=str(_uuid.uuid4()),
+            org_id=agent.org_id,
+            service_name=agent.name,
+            agent_id=agent.id,
+            notes=notes,
+        )
+        session.add(traj)
+        await session.commit()
+        return agent, traj
+    return _factory
+
+
+@pytest_asyncio.fixture
+async def seed_agent_with_trajectories(session, seed_agent):
+    """Seed an agent + multiple trajectories with configurable properties.
+
+    Each trajectory spec supports:
+        started_at_minus_hours: float (default 0) — how long ago the traj started
+        duration_ms: int | None
+        feedback_thumbs_down: int (default 0)
+        feedback_thumbs_up: int (default 0)
+        completed: bool | None (default None)
+    """
+    from datetime import datetime, timedelta, timezone
+    from app.models import Trajectory
+
+    async def _factory(*, trajectories):
+        agent = await seed_agent()
+        now = datetime.now(timezone.utc)
+        created = []
+        for spec in trajectories:
+            started = now - timedelta(hours=spec.get("started_at_minus_hours", 0))
+            duration_ms = spec.get("duration_ms")
+            ended = (
+                started + timedelta(milliseconds=duration_ms)
+                if duration_ms is not None
+                else None
+            )
+            traj = Trajectory(
+                id=str(_uuid.uuid4()),
+                org_id=agent.org_id,
+                service_name=agent.name,
+                agent_id=agent.id,
+                started_at=started,
+                ended_at=ended,
+                duration_ms=duration_ms,
+                feedback_thumbs_down=spec.get("feedback_thumbs_down", 0),
+                feedback_thumbs_up=spec.get("feedback_thumbs_up", 0),
+                completed=spec.get("completed"),
+            )
+            session.add(traj)
+            created.append(traj)
+        await session.commit()
+        return agent
+    return _factory
+
+
+@pytest_asyncio.fixture
+async def seed_agent_with_heuristic_hits(session, seed_agent):
+    """Seed an agent + trajectories each with a HeuristicHit.
+
+    Each hit spec: `{"heuristic": "tool_error", "tool": "search_orders", "count": 12}`.
+    `count` hits are created, each on its own trajectory, all at `now`.
+    """
+    from datetime import datetime, timezone
+    from app.models import Trajectory, HeuristicHit
+
+    async def _factory(*, hits):
+        agent = await seed_agent()
+        now = datetime.now(timezone.utc)
+        for spec in hits:
+            for _ in range(spec["count"]):
+                traj = Trajectory(
+                    id=str(_uuid.uuid4()),
+                    org_id=agent.org_id,
+                    service_name=agent.name,
+                    agent_id=agent.id,
+                    started_at=now,
+                )
+                session.add(traj)
+                await session.flush()
+                hit = HeuristicHit(
+                    id=str(_uuid.uuid4()),
+                    org_id=agent.org_id,
+                    trajectory_id=traj.id,
+                    heuristic=spec["heuristic"],
+                    severity=0.5,  # heuristic's internal severity, not worklist scoring
+                    signature=f"{spec['heuristic']}:{spec.get('tool', 'none')}",
+                    details={"tool": spec.get("tool")} if spec.get("tool") else {},
+                    created_at=now,
+                )
+                session.add(hit)
+        await session.commit()
+        return agent
+    return _factory

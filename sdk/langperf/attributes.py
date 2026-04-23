@@ -25,6 +25,7 @@ NODE_NAME = "langperf.node.name"
 STATUS_TAG = "langperf.status_tag"
 NOTES = "langperf.notes"
 NOTE = "langperf.note"  # legacy — per-node note; kept for back-compat
+COMPLETED = "langperf.completed"
 
 # ── User / session attribution (per-trajectory) ──────────────────────────
 USER_ID = "langperf.user.id"
@@ -54,6 +55,7 @@ __all__ = [
     "STATUS_TAG",
     "NOTES",
     "NOTE",
+    "COMPLETED",
     "USER_ID",
     "USER_EMAIL",
     "USER_DISPLAY_NAME",

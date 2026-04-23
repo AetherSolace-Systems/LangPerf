@@ -26,7 +26,13 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.constants import ALLOWED_TAGS, ATTR_NODE_KIND, ATTR_NOTES, ATTR_STATUS_TAG
+from app.constants import (
+    ALLOWED_TAGS,
+    ATTR_COMPLETED,
+    ATTR_NODE_KIND,
+    ATTR_NOTES,
+    ATTR_STATUS_TAG,
+)
 from app.models import Agent, Span, Trajectory
 from app.otlp.agent_resolver import resolve_agent_and_version
 from app.otlp.attrs import (
@@ -250,6 +256,14 @@ def _apply_sdk_signals(trajectory: Trajectory, span: DecodedSpan) -> bool:
     notes = attrs.get(ATTR_NOTES)
     if isinstance(notes, str) and notes and trajectory.notes != notes:
         trajectory.notes = notes
+        changed = True
+
+    completed = attrs.get(ATTR_COMPLETED)
+    # Decoder normalizes OTLP AnyValue.bool_value to native bool; reject
+    # string ("true") or int (1) encodings so a misstamped SDK surfaces
+    # as "unknown" rather than silently writing the wrong value.
+    if isinstance(completed, bool) and trajectory.completed != completed:
+        trajectory.completed = completed
         changed = True
 
     return changed

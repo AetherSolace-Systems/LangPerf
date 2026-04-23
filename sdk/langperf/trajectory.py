@@ -25,6 +25,7 @@ from opentelemetry.sdk.trace import Span
 
 from langperf._baggage import BAGGAGE_TRAJECTORY_ID, BAGGAGE_TRAJECTORY_NAME
 from langperf.attributes import (
+    COMPLETED,
     METADATA_PREFIX,
     SESSION_ID,
     USER_DISPLAY_NAME,
@@ -107,6 +108,10 @@ class _Trajectory:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         try:
+            # Stamp completion BEFORE closing the span context. Otherwise
+            # the span is already ended and the attribute silently drops.
+            if self._span is not None:
+                self._span.set_attribute(COMPLETED, exc_type is None)
             if self._span_cm is not None:
                 self._span_cm.__exit__(exc_type, exc_val, exc_tb)
         finally:

@@ -13,12 +13,16 @@ import {
   getAgentPrompts,
   getAgentRuns,
   getAgentTools,
+  getAgentWorklist,
+  getAgentTimeseries,
   type AgentDetail,
   type AgentMetrics,
   type AgentPromptRow,
   type AgentRunsResponse,
   type AgentToolUsage,
   type TimeWindow,
+  type WorklistItem,
+  type MetricSeries,
 } from "@/lib/api";
 import { IdentityStrip } from "@/components/agent/identity-strip";
 import { RunsTable } from "@/components/agent/runs-table";
@@ -26,11 +30,12 @@ import { VersionsTimeline } from "@/components/agent/versions-timeline";
 import { ToolsTable } from "@/components/agent/tools-table";
 import { ConfigForm } from "@/components/agent/config-form";
 import { PromptsView } from "@/components/agent/prompts-view";
-import { TopTools } from "@/components/dashboard/top-tools";
-import { TokensCostChart } from "@/components/charts/tokens-cost-chart";
-import { LineChart } from "@/components/charts/line-chart";
 import { StackedBarChart } from "@/components/charts/bar-chart";
 import { TimeRangePicker } from "@/components/agent/time-range-picker";
+import { SharedCursorProvider } from "@/components/charts/shared-cursor";
+import { TrendChart } from "@/components/charts/trend-chart";
+import { AgentWorklist } from "@/components/agent/worklist";
+import { ExportBar } from "@/components/agent/export-bar";
 
 export const dynamic = "force-dynamic";
 
@@ -175,6 +180,10 @@ function tokensCostFromRuns(
     });
 }
 
+function seriesFor(series: MetricSeries[], metric: string): MetricSeries["buckets"] {
+  return series.find((s) => s.metric === metric)?.buckets ?? [];
+}
+
 function SimpleVolume({
   runs,
   window,
@@ -236,19 +245,30 @@ export default async function AgentTab({
   let tools: AgentToolUsage[] = [];
   let runs: AgentRunsResponse | null = null;
   let prompts: AgentPromptRow[] = [];
+  let worklist: WorklistItem[] = [];
+  let timeseries: MetricSeries[] = [];
 
   if (tab === "overview") {
     try {
-      const [m, t, r] = await Promise.all([
+      const [m, t, r, w, ts] = await Promise.all([
         getAgentMetrics(name, window),
         getAgentTools(name, window),
         getAgentRuns(name, { limit: 10 }),
+        getAgentWorklist(name, window),
+        getAgentTimeseries(name, window, [
+          "p95_latency",
+          "cost_per_1k",
+          "tool_success",
+          "feedback_down",
+        ]),
       ]);
       metrics = m;
       tools = t;
       runs = r;
+      worklist = w;
+      timeseries = ts;
     } catch {
-      // leave nulls; page renders empty states
+      // leave empties; page renders empty states
     }
   } else if (tab === "runs") {
     try {
@@ -366,90 +386,56 @@ export default async function AgentTab({
 
       {tab === "overview" ? (
         <>
-          <div className="grid grid-cols-5 gap-[8px] mb-[10px]">
-            <KpiTile
-              label={`runs · ${window}`}
-              value={metrics ? metrics.runs.toLocaleString() : "—"}
-            />
-            <KpiTile
-              label="error rate"
-              value={metrics ? `${(metrics.error_rate * 100).toFixed(1)}%` : "—"}
-              accent={metrics != null && metrics.error_rate > 0}
-              warn={metrics != null && metrics.error_rate > 0.05}
-            />
-            <KpiTile
-              label="p95 latency"
-              value={metrics?.p95_latency_ms != null ? `${metrics.p95_latency_ms}ms` : "—"}
-            />
-            <KpiTile label="tools called" value={String(tools.length)} />
-            <KpiTile
-              label="total tokens"
-              value={metrics ? metrics.total_tokens.toLocaleString() : "—"}
-            />
+          <div className="flex items-center justify-end mb-[10px]">
+            <ExportBar agentName={name} window={window} />
           </div>
 
-          <div className="grid grid-cols-2 gap-[8px] mb-[10px]">
-            <Card title={`Run volume · ${window}`}>
-              <SimpleVolume runs={runs?.items ?? []} window={window} />
-            </Card>
-            <Card title={`Latency · p50/p95/p99 · ${window}`}>
-              <LineChart
-                lines={[
-                  {
-                    name: "p50",
-                    color: "#E8A87C",
-                    values: (metrics?.latency_series ?? []).map((p) => p.p50_latency_ms),
-                  },
-                  {
-                    name: "p95",
-                    color: "#6BBAB1",
-                    values: (metrics?.latency_series ?? []).map((p) => p.p95_latency_ms),
-                  },
-                  {
-                    name: "p99",
-                    color: "#D98A6A",
-                    values: (metrics?.latency_series ?? []).map((p) => p.p99_latency_ms),
-                  },
-                ]}
-                xLabels={latencyXLabels(metrics, window)}
-                yTicks={latencyTicks(metrics)}
-                yFormat={(v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${v}ms`)}
-              />
-            </Card>
-          </div>
+          <SharedCursorProvider>
+            <div className="grid grid-cols-2 gap-[8px] mb-[10px]">
+              <Card title={`p95 latency · ${window}`}>
+                <TrendChart
+                  metric="p95_latency"
+                  buckets={seriesFor(timeseries, "p95_latency")}
+                  format={(v) =>
+                    v >= 1000 ? `${(v / 1000).toFixed(2)}s` : `${Math.round(v)}ms`
+                  }
+                  color="#6BBAB1"
+                />
+              </Card>
+              <Card title={`cost / 1k runs · ${window}`}>
+                <TrendChart
+                  metric="cost_per_1k"
+                  buckets={seriesFor(timeseries, "cost_per_1k")}
+                  format={(v) => `$${v.toFixed(3)}`}
+                  color="#E8A87C"
+                />
+              </Card>
+              <Card title={`tool success · ${window}`}>
+                <TrendChart
+                  metric="tool_success"
+                  buckets={seriesFor(timeseries, "tool_success")}
+                  format={(v) => `${(v * 100).toFixed(1)}%`}
+                  color="#A78BFA"
+                />
+              </Card>
+              <Card title={`user 👎 · ${window}`}>
+                <TrendChart
+                  metric="feedback_down"
+                  buckets={seriesFor(timeseries, "feedback_down")}
+                  format={(v) => String(Math.round(v))}
+                  color="#D98A6A"
+                />
+              </Card>
+            </div>
+          </SharedCursorProvider>
 
-          <div className="grid grid-cols-2 gap-[8px] mb-[10px]">
-            <Card
-              title={`Tokens & cost · ${window}`}
-              right="cost estimated @ gpt-4o-mini pricing"
-            >
-              <TokensCostChart buckets={tokensCostFromRuns(runs?.items ?? [])} />
-            </Card>
-            <Card title={`Tools · ${window}`} right="defs →">
-              <TopTools tools={tools} />
-            </Card>
-          </div>
+          <AgentWorklist agentName={name} items={worklist} />
+
+          <div className="h-[10px]" />
 
           <Card title="Recent runs" className="!p-0">
             <RunsTable rows={runs?.items ?? []} />
           </Card>
-
-          <div className="h-[10px]" />
-
-          <div className="grid grid-cols-3 gap-[8px]">
-            <V2Card
-              label="Eval set · pass rate"
-              body="Run a curated eval set against every new version. Gate prod promotion on pass rate."
-            />
-            <V2Card
-              label="Comments & reviewers"
-              body="SME notes on specific nodes. Assign flagged runs to reviewers."
-            />
-            <V2Card
-              label="Replay against new prompt"
-              body="Re-run a flagged trajectory against the next version to check if the issue was fixed."
-            />
-          </div>
         </>
       ) : tab === "runs" ? (
         <Card
