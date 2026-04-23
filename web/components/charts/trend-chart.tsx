@@ -9,10 +9,27 @@ export type TrendBucket = {
   count: number;
 };
 
+// String token instead of a function so the prop can cross the RSC boundary
+// from server-rendered pages.
+export type TrendFormat = "latency_ms" | "usd3" | "pct1" | "int";
+
+function formatValue(fmt: TrendFormat, v: number): string {
+  switch (fmt) {
+    case "latency_ms":
+      return v >= 1000 ? `${(v / 1000).toFixed(2)}s` : `${Math.round(v)}ms`;
+    case "usd3":
+      return `$${v.toFixed(3)}`;
+    case "pct1":
+      return `${(v * 100).toFixed(1)}%`;
+    case "int":
+      return String(Math.round(v));
+  }
+}
+
 type Props = {
   metric: string;
   buckets: TrendBucket[];
-  format: (v: number) => string;
+  format: TrendFormat;
   color: string;
   height?: number;
   label?: string;
@@ -139,7 +156,7 @@ export function TrendChart({
             whiteSpace: "nowrap",
           }}
         >
-          {format(hoverBucket.value)}{" "}
+          {formatValue(format, hoverBucket.value)}{" "}
           <span className="text-patina ml-1.5">
             {new Date(hoverBucket.ts_ms).toLocaleTimeString(undefined, {
               hour: "2-digit",

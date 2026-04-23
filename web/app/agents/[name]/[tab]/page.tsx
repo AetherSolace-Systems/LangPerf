@@ -396,9 +396,7 @@ export default async function AgentTab({
                 <TrendChart
                   metric="p95_latency"
                   buckets={seriesFor(timeseries, "p95_latency")}
-                  format={(v) =>
-                    v >= 1000 ? `${(v / 1000).toFixed(2)}s` : `${Math.round(v)}ms`
-                  }
+                  format="latency_ms"
                   color="#6BBAB1"
                 />
               </Card>
@@ -406,7 +404,7 @@ export default async function AgentTab({
                 <TrendChart
                   metric="cost_per_1k"
                   buckets={seriesFor(timeseries, "cost_per_1k")}
-                  format={(v) => `$${v.toFixed(3)}`}
+                  format="usd3"
                   color="#E8A87C"
                 />
               </Card>
@@ -414,7 +412,7 @@ export default async function AgentTab({
                 <TrendChart
                   metric="tool_success"
                   buckets={seriesFor(timeseries, "tool_success")}
-                  format={(v) => `${(v * 100).toFixed(1)}%`}
+                  format="pct1"
                   color="#A78BFA"
                 />
               </Card>
@@ -422,7 +420,7 @@ export default async function AgentTab({
                 <TrendChart
                   metric="feedback_down"
                   buckets={seriesFor(timeseries, "feedback_down")}
-                  format={(v) => String(Math.round(v))}
+                  format="int"
                   color="#D98A6A"
                 />
               </Card>
