@@ -68,7 +68,7 @@ async def render_csv(
             )
             .where(
                 Span.started_at >= window_start,
-                Span.attributes["langperf.node.kind"].astext.in_(["tool", "tool_call"]),
+                Span.attributes.op("->>")("langperf.node.kind").in_(["tool", "tool_call"]),
             )
             .group_by(Span.trajectory_id)
             .subquery()

@@ -208,7 +208,7 @@ async def _tool_success_rows(session, agent_id, start, end, step_ms):
             Trajectory.agent_id == agent_id,
             Span.started_at >= start,
             Span.started_at < end,
-            Span.attributes["langperf.node.kind"].astext.in_(["tool", "tool_call"]),
+            Span.attributes.op("->>")("langperf.node.kind").in_(["tool", "tool_call"]),
         )
         .group_by("bucket_ms")
         .order_by("bucket_ms")

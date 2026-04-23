@@ -148,7 +148,7 @@ async def _snapshot(session, agent_id, window_start, now, hours):
                 .where(
                     Trajectory.agent_id == agent_id,
                     Span.started_at >= window_start,
-                    Span.attributes["langperf.node.kind"].astext.in_(["tool", "tool_call"]),
+                    Span.attributes.op("->>")("langperf.node.kind").in_(["tool", "tool_call"]),
                 )
             )
         ).one()
@@ -188,7 +188,7 @@ async def _tool_landscape(session, agent_id, window_start):
 
     stmt = (
         select(
-            Span.attributes["tool.name"].astext.label("tool"),
+            Span.attributes.op("->>")("tool.name").label("tool"),
             func.count().label("calls"),
             ok_expr,
             func.percentile_cont(0.95).within_group(Span.duration_ms).label("p95"),
@@ -197,7 +197,7 @@ async def _tool_landscape(session, agent_id, window_start):
         .where(
             Trajectory.agent_id == agent_id,
             Span.started_at >= window_start,
-            Span.attributes["langperf.node.kind"].astext.in_(["tool", "tool_call"]),
+            Span.attributes.op("->>")("langperf.node.kind").in_(["tool", "tool_call"]),
         )
         .group_by("tool")
         .order_by(func.count().desc())

@@ -374,7 +374,7 @@ async def _tool_stats(
     ).label("ok")
     stmt = (
         select(
-            Span.attributes["tool.name"].astext.label("tool"),
+            Span.attributes.op("->>")("tool.name").label("tool"),
             ok_expr,
             func.count().label("total"),
         )
@@ -383,7 +383,7 @@ async def _tool_stats(
             Trajectory.agent_id == agent_id,
             Span.started_at >= start,
             Span.started_at < end,
-            Span.attributes["langperf.node.kind"].astext.in_(["tool", "tool_call"]),
+            Span.attributes.op("->>")("langperf.node.kind").in_(["tool", "tool_call"]),
         )
         .group_by("tool")
     )
