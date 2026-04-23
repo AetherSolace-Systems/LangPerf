@@ -6,7 +6,7 @@ import uuid
 import pytest
 
 import langperf
-from langperf.attributes import NODE_KIND, TRAJECTORY_ID
+from langperf.attributes import COMPLETED, NODE_KIND, TRAJECTORY_ID
 
 from .conftest import finished_spans
 
@@ -62,3 +62,35 @@ def test_default_behavior_unchanged_when_id_not_provided(exporter):
     assert uuid.UUID(t.id)  # parses cleanly
     root = finished_spans(exporter)[0]
     assert root.attributes[TRAJECTORY_ID] == t.id
+
+
+def test_final_false_does_not_stamp_completed(exporter):
+    with langperf.trajectory("seg-mid", final=False):
+        pass
+    root = finished_spans(exporter)[0]
+    assert COMPLETED not in root.attributes
+
+
+def test_final_false_does_not_stamp_completed_on_exception(exporter):
+    with pytest.raises(RuntimeError):
+        with langperf.trajectory("seg-mid-fail", final=False):
+            raise RuntimeError("mid-segment boom")
+    root = finished_spans(exporter)[0]
+    # Even on exception, non-final segment leaves completed unset so a
+    # later final segment can authoritatively stamp the run's outcome.
+    assert COMPLETED not in root.attributes
+
+
+def test_final_true_default_still_stamps_completed(exporter):
+    with langperf.trajectory("seg-final"):
+        pass
+    root = finished_spans(exporter)[0]
+    assert root.attributes[COMPLETED] is True
+
+
+def test_final_true_stamps_false_on_exception(exporter):
+    with pytest.raises(RuntimeError):
+        with langperf.trajectory("seg-final-fail", final=True):
+            raise RuntimeError("boom")
+    root = finished_spans(exporter)[0]
+    assert root.attributes[COMPLETED] is False
